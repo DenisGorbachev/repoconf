@@ -7,32 +7,35 @@ use std::process::{Command, ExitStatus};
 
 #[derive(Parser, Clone, Debug)]
 pub struct CreateCommand {
-    #[arg(long, short, value_parser = value_parser!(PathBuf))]
-    dir: Option<PathBuf>,
-
     #[arg(long, short)]
-    parent_name: String,
+    parent_remote_name: String,
 
     #[arg(long, short = 'u')]
-    parent_url: GitRemoteUrl,
+    parent_remote_url: GitRemoteUrl,
+
+    #[arg(long, short, value_parser = value_parser!(PathBuf))]
+    repo_clone_dir: Option<PathBuf>,
 
     /// The name of the repository
     #[arg(long, short)]
-    name: String,
+    repo_name: String,
+
+    #[arg(long, short)]
+    repo_owner: String,
 }
 
 impl CreateCommand {
     pub async fn run(self, _stdin: &mut impl Read, _stdout: &mut impl Write, _stderr: &mut impl Write) -> Outcome {
         let Self {
-            dir,
-            parent_name,
-            parent_url,
-            name,
+            repo_clone_dir: dir,
+            parent_remote_name,
+            parent_remote_url,
+            repo_name,
+            repo_owner,
         } = self;
 
-        let repo_name_short = format!("repoconf-{}", name);
-        let repo_owner = "DenisGorbachev";
-        let repo_name_long = format!("{}/{}", repo_owner, repo_name_short);
+        let repo_name_short = format!("repoconf-{repo_name}");
+        let repo_name_long = format!("{repo_owner}/{repo_name_short}");
         let repo_dir = dir.unwrap_or_else(|| PathBuf::from("/tmp").join(repo_name_short));
 
         if !gh_repo_exists(&repo_name_long)? {
@@ -53,7 +56,9 @@ impl CreateCommand {
         repo_dir.ensure_branch("configs")?;
         repo_dir.ensure_branch("test")?;
 
-        repo_dir.cmd("git", &["remote", "add", &parent_name, &parent_url]).run()?;
+        repo_dir
+            .cmd("git", &["remote", "add", &parent_remote_name, &parent_remote_url])
+            .run()?;
 
         Ok(())
     }
