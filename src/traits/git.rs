@@ -1,6 +1,6 @@
 use duct::{cmd, Expression, IntoExecutablePath};
 use std::ffi::OsString;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 pub trait Cmd {
     fn cmd<T, U>(&self, program: T, args: U) -> Expression

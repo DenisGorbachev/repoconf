@@ -1,7 +1,5 @@
-use crate::{task, Cmd, EnsureBranch, GitRemoteUrl, Outcome};
+use crate::{Cmd, EnsureBranch, GitRemoteUrl, Outcome};
 use clap::{value_parser, Parser};
-use demand::Confirm;
-use duct::cmd;
 use std::io;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
@@ -63,7 +61,7 @@ impl CreateCommand {
 
 fn gh_repo_exists(repo_full_name: &str) -> Outcome<bool> {
     let output = Command::new("gh")
-        .args(&["repo", "view", repo_full_name])
+        .args(["repo", "view", repo_full_name])
         .status()?;
 
     Ok(output.success())
@@ -71,13 +69,13 @@ fn gh_repo_exists(repo_full_name: &str) -> Outcome<bool> {
 
 fn gh_repo_create(repo_full_name: &str) -> io::Result<ExitStatus> {
     Command::new("gh")
-        .args(&["repo", "create", repo_full_name])
+        .args(["repo", "create", repo_full_name])
         .status()
 }
 
 fn gh_repo_clone(repo_full_name: &str, repo_dir: &Path) -> io::Result<ExitStatus> {
     Command::new("gh")
-        .args(&[
+        .args([
             "repo",
             "clone",
             repo_full_name,
