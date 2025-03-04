@@ -9,3 +9,5 @@ pub use command::*;
 mod cli;
 
 pub use cli::*;
+mod git_remote_url;
+pub use git_remote_url::*;
