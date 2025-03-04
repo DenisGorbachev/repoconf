@@ -1,21 +1,19 @@
 [package]
-name = "rust-cli-app-template"
+name = "repoconf"
 version = "0.1.0"
 edition = "2021"
-description = "A template for creating Rust CLI apps with Clap."
 license = "Apache-2.0 OR MIT"
-homepage = "https://github.com/DenisGorbachev/rust-cli-app-template"
-repository = "https://github.com/DenisGorbachev/rust-cli-app-template"
+homepage = "https://github.com/DenisGorbachev/repoconf"
+repository = "https://github.com/DenisGorbachev/repoconf"
 readme = "README.md"
 keywords = []
 categories = []
 
 [package.metadata.details]
-title = "Rust CLI app template"
 tagline = ""
 summary = ""
 announcement = ""
-readme = { generate = false }
+readme = {}
 
 [dependencies]
 clap = { version = "4.5.11", features = ["derive"] }
@@ -31,3 +29,9 @@ tokio = { version = "1.39.2", features = ["macros", "fs", "net", "rt", "rt-multi
 
 [package.metadata.cargo-machete]
 ignored = ["derive_more", "derive-getters", "derive-new", "fmt-derive", "stub-macro", "standard-traits", "helpful", "subtype"]
+
+
+
+
+
+
