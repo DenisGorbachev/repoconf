@@ -6,28 +6,30 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, ExitStatus};
 
 #[derive(Parser, Clone, Debug)]
-pub struct CreateCommand {
+pub struct EnsureCommand {
     #[arg(long, short)]
     parent_remote_name: String,
 
     #[arg(long, short = 'u')]
     parent_remote_url: GitRemoteUrl,
 
-    #[arg(long, short, value_parser = value_parser!(PathBuf))]
-    repo_clone_dir: Option<PathBuf>,
-
-    /// The name of the repository
-    #[arg(long, short)]
+    /// Name of the remote GitHub repository
+    #[arg(long, short = 'n')]
     repo_name: String,
 
-    #[arg(long, short)]
+    /// Owner of the remote GitHub repository
+    #[arg(long, short, short = 'o')]
     repo_owner: String,
+
+    /// Directory of the local repository
+    #[arg(long, short, value_parser = value_parser!(PathBuf))]
+    dir: Option<PathBuf>,
 }
 
-impl CreateCommand {
+impl EnsureCommand {
     pub async fn run(self, _stdin: &mut impl Read, _stdout: &mut impl Write, _stderr: &mut impl Write) -> Outcome {
         let Self {
-            repo_clone_dir: dir,
+            dir,
             parent_remote_name,
             parent_remote_url,
             repo_name,

@@ -6,7 +6,7 @@ use Command::*;
 #[derive(Parser, Clone, Debug)]
 pub enum Command {
     Print(PrintCommand),
-    Create(CreateCommand),
+    Create(EnsureCommand),
 }
 
 impl Command {
@@ -19,7 +19,9 @@ impl Command {
 }
 
 mod print_command;
+
 pub use print_command::*;
 
-mod create_command;
-pub use create_command::*;
+mod ensure_command;
+
+pub use ensure_command::*;
