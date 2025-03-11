@@ -1,6 +1,5 @@
 use crate::{Outcome, Visibility};
 use clap::{value_parser, Parser};
-use log::warn;
 use std::io::{Read, Write};
 use std::path::PathBuf;
 use xshell::{cmd, Shell};
@@ -31,7 +30,7 @@ pub struct CreateCommand {
 // pub static SHELL: LazyLock<Shell> = LazyLock::new(|| Shell::new().expect("should create a new shell"));
 
 impl CreateCommand {
-    pub async fn run(self, _stdin: &mut impl Read, _stdout: &mut impl Write, _stderr: &mut impl Write) -> Outcome {
+    pub async fn run(self, _stdin: &mut impl Read, _stdout: &mut impl Write, stderr: &mut impl Write) -> Outcome {
         let Self {
             visibility,
             template,
@@ -49,11 +48,11 @@ impl CreateCommand {
         cmd!(sh, "gh repo clone {repo_name_full} {dir}").run_echo()?;
         let sh_dir = sh.with_current_dir(&dir);
         cmd!(sh_dir, "git remote add template {template}").run_echo()?;
-        let setup_script = sh_dir.current_dir().join(".repoconf/hooks/setup.sh");
-        if sh_dir.path_exists(&setup_script) {
-            cmd!(sh, ". {setup_script}").run_echo()?;
+        let post_init_script = sh_dir.current_dir().join(".repoconf/hooks/post-init.sh");
+        if sh_dir.path_exists(&post_init_script) {
+            cmd!(sh, ". {post_init_script}").run_echo()?;
         } else {
-            warn!("Setup script not found");
+            writeln!(stderr, "Could not find post-init script at {post_init_script}", post_init_script = post_init_script.display())?;
         }
 
         Ok(())

@@ -23,10 +23,13 @@ cargo add repoconf
 ## Usage
 
 ```shell
+A utility CLI for managing configs across repos
+
 Usage: repoconf <COMMAND>
 
 Commands:
   print   
+  ensure  
   create  
   help    Print this message or the help of the given subcommand(s)
 
