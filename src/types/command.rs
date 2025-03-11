@@ -7,6 +7,7 @@ use Command::*;
 pub enum Command {
     Print(PrintCommand),
     Ensure(EnsureCommand),
+    Create(CreateCommand),
 }
 
 impl Command {
@@ -14,6 +15,7 @@ impl Command {
         match self {
             Print(command) => command.run(stdin, stdout, stderr).await,
             Ensure(command) => command.run(stdin, stdout, stderr).await,
+            Create(command) => command.run(stdin, stdout, stderr).await,
         }
     }
 }
@@ -25,3 +27,7 @@ pub use print_command::*;
 mod ensure_command;
 
 pub use ensure_command::*;
+
+mod create_command;
+
+pub use create_command::*;
