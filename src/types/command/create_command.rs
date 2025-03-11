@@ -25,7 +25,7 @@ pub struct CreateCommand {
 
     /// Directory to clone the new repository to
     #[arg(value_parser = value_parser!(PathBuf))]
-    dir: String,
+    dir: PathBuf,
 }
 
 // pub static SHELL: LazyLock<Shell> = LazyLock::new(|| Shell::new().expect("should create a new shell"));
