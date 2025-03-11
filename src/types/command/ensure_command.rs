@@ -36,6 +36,21 @@ impl EnsureCommand {
             repo_owner,
         } = self;
 
+        /*
+        for template_repo in template_repos {
+            ensure_exists(template_repo.join(".repoconf/hooks/post-merge.sh"))?;
+            ensure_exists(template_repo.join(".repoconf/hooks/post-clone-as-template.sh"))?;
+            // ensure post-clone-as-template removes .repoconf
+            // ensure post-merge removes .repoconf
+        }
+
+        For each dir in my projects:
+          If it doesn't have a template:
+            template = ask_template()
+            // pipe stdin to repoconf/merge call
+            repoconf/merge.sh {dir} {template}
+        */
+
         let repo_name_short = format!("repoconf-{repo_name}");
         let repo_name_long = format!("{repo_owner}/{repo_name_short}");
         let repo_dir = dir.unwrap_or_else(|| PathBuf::from("/tmp").join(repo_name_short));

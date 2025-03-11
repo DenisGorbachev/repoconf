@@ -6,14 +6,14 @@ use Command::*;
 #[derive(Parser, Clone, Debug)]
 pub enum Command {
     Print(PrintCommand),
-    Create(EnsureCommand),
+    Ensure(EnsureCommand),
 }
 
 impl Command {
     pub async fn run(self, stdin: &mut impl Read, stdout: &mut impl Write, stderr: &mut impl Write) -> Outcome {
         match self {
             Print(command) => command.run(stdin, stdout, stderr).await,
-            Create(command) => command.run(stdin, stdout, stderr).await,
+            Ensure(command) => command.run(stdin, stdout, stderr).await,
         }
     }
 }
