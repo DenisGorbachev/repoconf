@@ -1,6 +1,7 @@
 use crate::{Outcome, SetExecutableBit, Visibility};
 use clap::{value_parser, Parser};
 use std::path::PathBuf;
+use url::Url;
 use xshell::{cmd, Shell};
 
 #[derive(Parser, Clone, Debug)]
@@ -11,7 +12,7 @@ pub struct CreateCommand {
 
     /// GitHub template repo URL
     #[arg()]
-    template: String,
+    template: Url,
 
     /// Owner of the new repository
     #[arg()]
@@ -41,12 +42,17 @@ impl CreateCommand {
         let sh = Shell::new()?;
 
         let repo_name_full = format!("{repo_owner}/{repo_name}");
+        let remote_template_name = template
+            .path_segments()
+            .and_then(|split| split.last())
+            .unwrap_or("template");
         let visibility_arg = visibility.as_arg();
+        let template_str = template.as_str();
 
-        cmd!(sh, "gh repo create --template {template} {visibility_arg} {repo_name_full}").run_echo()?;
+        cmd!(sh, "gh repo create --template {template_str} {visibility_arg} {repo_name_full}").run_echo()?;
         cmd!(sh, "gh repo clone {repo_name_full} {dir}").run_echo()?;
         let sh_dir = sh.with_current_dir(&dir);
-        cmd!(sh_dir, "git remote add template {template}").run_echo()?;
+        cmd!(sh_dir, "git remote add {remote_template_name} {template_str}").run_echo()?;
         let post_init_script = sh_dir.current_dir().join(".repoconf/hooks/post-init.sh");
         post_init_script.set_executable_bit()?;
         if sh_dir.path_exists(&post_init_script) {
