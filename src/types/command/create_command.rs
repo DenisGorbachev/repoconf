@@ -1,6 +1,5 @@
 use crate::{Outcome, Visibility};
 use clap::{value_parser, Parser};
-use std::io::{Read, Write};
 use std::path::PathBuf;
 use xshell::{cmd, Shell};
 
@@ -30,7 +29,7 @@ pub struct CreateCommand {
 // pub static SHELL: LazyLock<Shell> = LazyLock::new(|| Shell::new().expect("should create a new shell"));
 
 impl CreateCommand {
-    pub async fn run(self, _stdin: &mut impl Read, _stdout: &mut impl Write, stderr: &mut impl Write) -> Outcome {
+    pub async fn run(self) -> Outcome {
         let Self {
             visibility,
             template,
@@ -52,7 +51,7 @@ impl CreateCommand {
         if sh_dir.path_exists(&post_init_script) {
             cmd!(sh, ". {post_init_script}").run_echo()?;
         } else {
-            writeln!(stderr, "Could not find post-init script at {post_init_script}", post_init_script = post_init_script.display())?;
+            eprintln!("Could not find post-init script at {post_init_script}", post_init_script = post_init_script.display());
         }
 
         Ok(())

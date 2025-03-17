@@ -1,6 +1,5 @@
 use crate::Outcome;
 use clap::Parser;
-use std::io::{Read, Write};
 use Command::*;
 
 #[derive(Parser, Clone, Debug)]
@@ -8,14 +7,16 @@ pub enum Command {
     Print(PrintCommand),
     Ensure(EnsureCommand),
     Create(CreateCommand),
+    Merge(MergeCommand),
 }
 
 impl Command {
-    pub async fn run(self, stdin: &mut impl Read, stdout: &mut impl Write, stderr: &mut impl Write) -> Outcome {
+    pub async fn run(self) -> Outcome {
         match self {
-            Print(command) => command.run(stdin, stdout, stderr).await,
-            Ensure(command) => command.run(stdin, stdout, stderr).await,
-            Create(command) => command.run(stdin, stdout, stderr).await,
+            Print(command) => command.run().await,
+            Ensure(command) => command.run().await,
+            Create(command) => command.run().await,
+            Merge(command) => command.run().await,
         }
     }
 }
@@ -31,3 +32,7 @@ pub use ensure_command::*;
 mod create_command;
 
 pub use create_command::*;
+
+mod merge_command;
+
+pub use merge_command::*;

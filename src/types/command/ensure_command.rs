@@ -1,7 +1,6 @@
 use crate::{Cmd, EnsureBranch, GitRemoteUrl, Outcome};
 use clap::{value_parser, Parser};
 use std::io;
-use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitStatus};
 
@@ -27,7 +26,7 @@ pub struct EnsureCommand {
 }
 
 impl EnsureCommand {
-    pub async fn run(self, _stdin: &mut impl Read, _stdout: &mut impl Write, _stderr: &mut impl Write) -> Outcome {
+    pub async fn run(self) -> Outcome {
         let Self {
             dir,
             parent_remote_name,
