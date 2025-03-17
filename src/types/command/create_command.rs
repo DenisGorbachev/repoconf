@@ -1,4 +1,4 @@
-use crate::{Outcome, Visibility};
+use crate::{Outcome, SetExecutableBit, Visibility};
 use clap::{value_parser, Parser};
 use std::path::PathBuf;
 use xshell::{cmd, Shell};
@@ -48,6 +48,7 @@ impl CreateCommand {
         let sh_dir = sh.with_current_dir(&dir);
         cmd!(sh_dir, "git remote add template {template}").run_echo()?;
         let post_init_script = sh_dir.current_dir().join(".repoconf/hooks/post-init.sh");
+        post_init_script.set_executable_bit()?;
         if sh_dir.path_exists(&post_init_script) {
             cmd!(sh, ". {post_init_script}").run_echo()?;
         } else {
