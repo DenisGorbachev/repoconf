@@ -41,10 +41,11 @@ impl CreateCommand {
 
         let sh = Shell::new()?;
 
+        let package_name = &repo_name;
         let repo_name_full = format!("{repo_owner}/{repo_name}");
         let remote_template_name = template
             .path_segments()
-            .and_then(|split| split.last())
+            .and_then(|mut split| split.next_back())
             .unwrap_or("template");
         let visibility_arg = visibility.as_arg();
         let template_str = template.as_str();
@@ -56,7 +57,7 @@ impl CreateCommand {
         let post_init_script = sh_dir.current_dir().join(".repoconf/hooks/post-init.sh");
         post_init_script.set_executable_bit()?;
         if sh_dir.path_exists(&post_init_script) {
-            cmd!(sh, "usage bash {post_init_script} {dir}").run_echo()?;
+            cmd!(sh, "usage bash {post_init_script} --name {package_name} {dir}").run_echo()?;
         } else {
             eprintln!("Could not find post-init script at {post_init_script}", post_init_script = post_init_script.display());
         }
