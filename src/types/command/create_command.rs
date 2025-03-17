@@ -11,7 +11,7 @@ pub struct CreateCommand {
     visibility: Visibility,
 
     /// GitHub template repo URL
-    #[arg()]
+    #[arg(value_parser = value_parser!(Url))]
     template: Url,
 
     /// Owner of the new repository
