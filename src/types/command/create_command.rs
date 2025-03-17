@@ -50,7 +50,7 @@ impl CreateCommand {
         let post_init_script = sh_dir.current_dir().join(".repoconf/hooks/post-init.sh");
         post_init_script.set_executable_bit()?;
         if sh_dir.path_exists(&post_init_script) {
-            cmd!(sh, ". {post_init_script}").run_echo()?;
+            cmd!(sh, "usage bash {post_init_script} {dir}").run_echo()?;
         } else {
             eprintln!("Could not find post-init script at {post_init_script}", post_init_script = post_init_script.display());
         }
