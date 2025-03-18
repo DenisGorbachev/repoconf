@@ -43,10 +43,11 @@ impl CreateCommand {
 
         let package_name = &repo_name;
         let repo_name_full = format!("{repo_owner}/{repo_name}");
-        let remote_template_name = template
+        let remote_template_name_suffix = template
             .path_segments()
             .and_then(|mut split| split.next_back())
             .unwrap_or("template");
+        let remote_template_name = format!("repoconf-{remote_template_name_suffix}");
         let visibility_arg = visibility.as_arg();
         let template_str = template.as_str();
 
