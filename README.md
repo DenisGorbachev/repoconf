@@ -31,6 +31,7 @@ Commands:
   print   
   ensure  
   create  
+  merge   
   help    Print this message or the help of the given subcommand(s)
 
 Options:
