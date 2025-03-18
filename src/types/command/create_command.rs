@@ -22,6 +22,14 @@ pub struct CreateCommand {
     #[arg()]
     repo_name: String,
 
+    /// Name of the origin remote
+    #[arg(long, short, default_value = "origin")]
+    origin_remote_name: String,
+
+    /// Name of the main branch
+    #[arg(long, short, default_value = "main")]
+    branch_name: String,
+
     /// Directory to clone the new repository to
     #[arg(value_parser = value_parser!(PathBuf))]
     dir: PathBuf,
@@ -36,6 +44,8 @@ impl CreateCommand {
             template,
             repo_owner,
             repo_name,
+            origin_remote_name,
+            branch_name,
             dir,
         } = self;
 
@@ -51,10 +61,14 @@ impl CreateCommand {
         let visibility_arg = visibility.as_arg();
         let template_str = template.as_str();
 
-        cmd!(sh, "gh repo create --template {template_str} {visibility_arg} {repo_name_full}").run_echo()?;
-        cmd!(sh, "gh repo clone {repo_name_full} {dir}").run_echo()?;
+        cmd!(sh, "gh repo create {visibility_arg} {repo_name_full}").run_echo()?;
+        cmd!(sh, "gh repo clone {repo_name_full} {dir} -- --origin {origin_remote_name}").run_echo()?;
         let sh_dir = sh.with_current_dir(&dir);
         cmd!(sh_dir, "git remote add {remote_template_name} {template_str}").run_echo()?;
+        cmd!(sh_dir, "git remote update {remote_template_name}").run_echo()?;
+        cmd!(sh_dir, "git checkout -b {branch_name} {remote_template_name}/{branch_name}").run_echo()?;
+        cmd!(sh_dir, "git branch --unset-upstream {branch_name}").run_echo()?;
+        cmd!(sh_dir, "git push --set-upstream {origin_remote_name} {branch_name}").run_echo()?;
         let post_init_script = sh_dir.current_dir().join(".repoconf/hooks/post-init.sh");
         post_init_script.set_executable_bit()?;
         if sh_dir.path_exists(&post_init_script) {
