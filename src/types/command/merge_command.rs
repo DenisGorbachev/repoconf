@@ -1,8 +1,7 @@
-use crate::{GitRemoteName, IsCleanRepo, Outcome, RepositoryNotCleanError};
+use crate::{GitRemoteNames, IsCleanRepo, Outcome, RepositoryNotCleanError};
 use clap::{value_parser, Parser};
 use itertools::Itertools;
-use std::path::{Path, PathBuf};
-use stub_macro::stub;
+use std::path::PathBuf;
 use xshell::{cmd, Shell};
 
 #[derive(Parser, Clone, Debug)]
@@ -29,7 +28,7 @@ impl MergeCommand {
             remote_branch_name,
             dir,
         } = self;
-        let sh = Shell::new()?;
+        let sh = Shell::new()?.with_current_dir(&dir);
 
         if !sh.is_clean_repo()? {
             return Err(RepositoryNotCleanError::new().into());
@@ -37,7 +36,8 @@ impl MergeCommand {
 
         cmd!(sh, "git checkout {local_branch_name}").run_echo()?;
 
-        let remotes = git_remote_names(&dir)
+        let remotes = sh
+            .git_remote_names()?
             .filter(|name| name.starts_with("repoconf"))
             .collect_vec();
         let remotes_slice = remotes.as_slice();
@@ -50,8 +50,4 @@ impl MergeCommand {
 
         Ok(())
     }
-}
-
-pub fn git_remote_names(_path: &Path) -> impl Iterator<Item = GitRemoteName> {
-    stub!(impl dyn Iterator<Item=GitRemoteName>)
 }
