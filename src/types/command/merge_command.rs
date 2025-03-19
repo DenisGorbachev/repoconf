@@ -10,15 +10,15 @@ pub struct MergeCommand {
     ///
     /// The command will switch to this branch before merging
     #[arg(long, short, default_value = "main")]
-    local_branch_name: String,
+    pub local_branch_name: String,
 
     /// Name of the remote branch to merge from
     #[arg(long, short, default_value = "main")]
-    remote_branch_name: String,
+    pub remote_branch_name: String,
 
     /// Child repository directory
     #[arg(short, long, value_parser = value_parser!(PathBuf))]
-    dir: PathBuf,
+    pub dir: PathBuf,
 }
 
 impl MergeCommand {
@@ -30,17 +30,24 @@ impl MergeCommand {
         } = self;
         let sh = Shell::new()?.with_current_dir(&dir);
 
+        let remotes = sh
+            .git_remote_names()?
+            .filter(|name| name.starts_with("repoconf"))
+            .collect_vec();
+
+        // return early if this repository has no repoconf remotes
+        // NOTE: [`PropagateCommand`] relies on this behavior
+        if remotes.is_empty() {
+            return Ok(());
+        }
+
+        let remotes_slice = remotes.as_slice();
+
         if !sh.is_clean_repo()? {
             return Err(RepositoryNotCleanError::new().into());
         }
 
         cmd!(sh, "git checkout {local_branch_name}").run_echo()?;
-
-        let remotes = sh
-            .git_remote_names()?
-            .filter(|name| name.starts_with("repoconf"))
-            .collect_vec();
-        let remotes_slice = remotes.as_slice();
 
         cmd!(sh, "git remote update {remotes_slice...}").run_echo()?;
 
