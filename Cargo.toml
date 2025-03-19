@@ -18,6 +18,7 @@ readme = { }
 
 [dependencies]
 clap = { version = "4.5.11", features = ["derive"] }
+cli-util = { git = "https://github.com/DenisGorbachev/cli-util" }
 demand = { version = "1.6.4" }
 derive-getters = { version = "0.5.0", features = ["auto_copy_getters"] }
 derive-new = "0.7.0"
