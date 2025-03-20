@@ -29,6 +29,7 @@ impl AddCommand {
         let remote_template_url = template.as_str();
 
         cmd!(sh, "git remote add {remote_template_name} {remote_template_url}").run_echo()?;
+        cmd!(sh, "git remote update {remote_template_name}").run_echo()?;
 
         Ok(())
     }
