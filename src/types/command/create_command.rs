@@ -1,4 +1,4 @@
-use crate::{git_remote_add_if_not_exists, DirectoryAlreadyExists, Outcome, RepositoryAlreadyExists, SetExecutableBit, Visibility};
+use crate::{git_remote_add_if_not_exists, DirectoryAlreadyExists, Outcome, RepoName, RepositoryAlreadyExists, SetExecutableBit, Visibility};
 use clap::{value_parser, Parser};
 use std::path::PathBuf;
 use url::Url;
@@ -43,8 +43,6 @@ pub struct CreateCommand {
     dir: PathBuf,
 }
 
-// pub static SHELL: LazyLock<Shell> = LazyLock::new(|| Shell::new().expect("should create a new shell"));
-
 impl CreateCommand {
     pub async fn run(self) -> Outcome {
         let Self {
@@ -63,10 +61,7 @@ impl CreateCommand {
 
         let package_name = &repo_name;
         let repo_name_full = format!("{repo_owner}/{repo_name}");
-        let remote_template_name_suffix = template
-            .path_segments()
-            .and_then(|mut split| split.next_back())
-            .unwrap_or("template");
+        let remote_template_name_suffix = template.repo_name();
         let remote_template_name = format!("repoconf-{remote_template_name_suffix}");
         let remote_template_url = template.as_str();
         let visibility_arg = visibility.as_arg();

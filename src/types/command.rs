@@ -5,6 +5,7 @@ use cli_util::command_enum;
 command_enum!(
     #[derive(Parser, Clone, Debug)]
     pub enum Command {
+        Add(AddCommand),
         Create(CreateCommand),
         Merge(MergeCommand),
         Propagate(PropagateCommand),
@@ -22,3 +23,7 @@ pub use merge_command::*;
 mod propagate_command;
 
 pub use propagate_command::*;
+
+mod add_command;
+
+pub use add_command::*;
