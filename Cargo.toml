@@ -26,6 +26,7 @@ derive_more = { version = "2.0.1", features = ["full"] }
 fmt-derive = "0.1.2"
 helpful = { git = "https://github.com/DenisGorbachev/helpful" }
 itertools = { version = "0.14.0" }
+not-found-error = { version = "0.2.3" }
 standard-traits = { git = "https://github.com/DenisGorbachev/standard-traits" }
 stub-macro = { version = "0.1.3" }
 subtype = { git = "https://github.com/DenisGorbachev/subtype" }

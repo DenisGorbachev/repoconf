@@ -1,13 +1,8 @@
 mod outcome;
-
 pub use outcome::*;
-
 mod command;
-
 pub use command::*;
-
 mod cli;
-
 pub use cli::*;
 mod git_remote_url;
 pub use git_remote_url::*;
@@ -27,3 +22,7 @@ mod git_remote;
 pub use git_remote::*;
 mod local_branch_does_not_exist_error;
 pub use local_branch_does_not_exist_error::*;
+mod branch_name_strategy;
+pub use branch_name_strategy::*;
+mod git_branch_name;
+pub use git_branch_name::*;

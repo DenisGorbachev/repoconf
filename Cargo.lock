@@ -543,6 +543,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "not-found-error"
+version = "0.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8f05a6809e0cba8f2d75fea10eeeb7e25bdd78a97c1d3f2dfc0d3fe64ffc2cfe"
+
+[[package]]
 name = "object"
 version = "0.36.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -639,6 +645,7 @@ dependencies = [
  "fmt-derive",
  "helpful",
  "itertools",
+ "not-found-error",
  "standard-traits",
  "stub-macro",
  "subtype",

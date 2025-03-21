@@ -1,4 +1,4 @@
-use crate::{some_or_current_dir, GitLocalBranchExists, GitRemoteNames, IsCleanRepo, LocalBranchDoesNotExistError, Outcome, RepositoryNotCleanError};
+use crate::{git_refs, some_or_current_dir, BranchNameStrategy, GitLocalBranchExists, GitRemoteNames, IsCleanRepo, LocalBranchDoesNotExistError, Outcome, RepositoryNotCleanError};
 use clap::{value_parser, Parser};
 use itertools::Itertools;
 use std::path::PathBuf;
@@ -12,23 +12,29 @@ pub struct MergeCommand {
 
     /// Name of the local branch to merge onto
     ///
-    /// The command will switch to this branch before merging
+    /// If you pass "-", the command will determine the branch automatically: use "main" if exists, use "master" if exists.
     ///
     /// If the local branch doesn't exist, the command will exit with an error
-    #[arg(long, short, default_value = "main")]
-    pub local_branch_name: String,
+    ///
+    /// The command will switch to this branch before merging
+    #[arg(long = "local-branch", short = 'l', default_value = "-")]
+    pub local_branch_strategy: BranchNameStrategy,
 
     /// Name of the remote branch to merge from
-    #[arg(long, short, default_value = "main")]
-    pub remote_branch_name: String,
+    ///
+    /// If you pass "-", the command will determine the branch automatically: use "main" if exists, use "master" if exists.
+    ///
+    /// Note that this is applied to all remotes
+    #[arg(long = "remote-branch", short = 'r', default_value = "-")]
+    pub remote_branch_strategy: BranchNameStrategy,
 }
 
 impl MergeCommand {
     pub async fn run(self) -> Outcome {
         let Self {
             dir,
-            local_branch_name,
-            remote_branch_name,
+            local_branch_strategy,
+            remote_branch_strategy,
         } = self;
 
         let dir = some_or_current_dir(dir)?;
@@ -51,6 +57,10 @@ impl MergeCommand {
             return Err(RepositoryNotCleanError::new().into());
         }
 
+        let refs = git_refs(&sh)?;
+
+        let local_branch_name = local_branch_strategy.to_branch_name("refs/heads", &refs)?;
+
         if !sh.git_local_branch_exists(&local_branch_name)? {
             return Err(LocalBranchDoesNotExistError::new(local_branch_name).into());
         }
@@ -60,6 +70,8 @@ impl MergeCommand {
         cmd!(sh, "git remote update {remotes_slice...}").run_echo()?;
 
         for remote in remotes {
+            let remote_branch_name = remote_branch_strategy.to_branch_name(&format!("refs/remotes/{remote}"), &refs)?;
+
             cmd!(sh, "git merge {remote}/{remote_branch_name}").run_echo()?;
         }
 
