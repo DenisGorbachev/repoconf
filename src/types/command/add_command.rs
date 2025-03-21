@@ -1,4 +1,4 @@
-use crate::{Outcome, RepoName};
+use crate::{some_or_current_dir, Outcome, RepoName};
 use clap::{value_parser, Parser};
 use std::path::PathBuf;
 use url::Url;
@@ -6,13 +6,13 @@ use xshell::{cmd, Shell};
 
 #[derive(Parser, Clone, Debug)]
 pub struct AddCommand {
+    /// Target repo directory (defaults to current dir)
+    #[arg(long, short, value_parser = value_parser!(PathBuf))]
+    dir: Option<PathBuf>,
+
     /// Template repo URL
     #[arg(value_parser = value_parser!(Url))]
     template: Url,
-
-    /// Target repo directory
-    #[arg(value_parser = value_parser!(PathBuf))]
-    dir: PathBuf,
 }
 
 impl AddCommand {
@@ -22,6 +22,7 @@ impl AddCommand {
             dir,
         } = self;
 
+        let dir = some_or_current_dir(dir)?;
         let sh = Shell::new()?.with_current_dir(dir);
 
         let remote_template_name_suffix = template.repo_name();

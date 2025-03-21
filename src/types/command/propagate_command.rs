@@ -39,7 +39,7 @@ impl PropagateCommand {
             let merge_command = MergeCommand {
                 local_branch_name: local_branch_name.clone(),
                 remote_branch_name: remote_branch_name.clone(),
-                dir: repo.path().to_path_buf(),
+                dir: Some(repo.path().to_path_buf()),
             };
             merge_command.run().await?;
         }

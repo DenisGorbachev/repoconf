@@ -1,4 +1,4 @@
-use crate::{GitRemoteNames, IsCleanRepo, Outcome, RepositoryNotCleanError};
+use crate::{some_or_current_dir, GitRemoteNames, IsCleanRepo, Outcome, RepositoryNotCleanError};
 use clap::{value_parser, Parser};
 use itertools::Itertools;
 use std::path::PathBuf;
@@ -6,6 +6,10 @@ use xshell::{cmd, Shell};
 
 #[derive(Parser, Clone, Debug)]
 pub struct MergeCommand {
+    /// Child repository directory (defaults to current directory)
+    #[arg(long, short, value_parser = value_parser!(PathBuf))]
+    pub dir: Option<PathBuf>,
+
     /// Name of the local branch to merge onto
     ///
     /// The command will switch to this branch before merging
@@ -15,19 +19,17 @@ pub struct MergeCommand {
     /// Name of the remote branch to merge from
     #[arg(long, short, default_value = "main")]
     pub remote_branch_name: String,
-
-    /// Child repository directory
-    #[arg(short, long, value_parser = value_parser!(PathBuf))]
-    pub dir: PathBuf,
 }
 
 impl MergeCommand {
     pub async fn run(self) -> Outcome {
         let Self {
+            dir,
             local_branch_name,
             remote_branch_name,
-            dir,
         } = self;
+
+        let dir = some_or_current_dir(dir)?;
         let sh = Shell::new()?.with_current_dir(&dir);
 
         let remotes = sh
