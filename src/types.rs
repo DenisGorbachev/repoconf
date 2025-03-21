@@ -25,3 +25,5 @@ mod directory_already_exists;
 pub use directory_already_exists::*;
 mod git_remote;
 pub use git_remote::*;
+mod local_branch_does_not_exist_error;
+pub use local_branch_does_not_exist_error::*;

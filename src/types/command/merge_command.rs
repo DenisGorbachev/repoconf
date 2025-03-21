@@ -1,4 +1,4 @@
-use crate::{some_or_current_dir, GitRemoteNames, IsCleanRepo, Outcome, RepositoryNotCleanError};
+use crate::{some_or_current_dir, GitLocalBranchExists, GitRemoteNames, IsCleanRepo, LocalBranchDoesNotExistError, Outcome, RepositoryNotCleanError};
 use clap::{value_parser, Parser};
 use itertools::Itertools;
 use std::path::PathBuf;
@@ -13,6 +13,8 @@ pub struct MergeCommand {
     /// Name of the local branch to merge onto
     ///
     /// The command will switch to this branch before merging
+    ///
+    /// If the local branch doesn't exist, the command will exit with an error
     #[arg(long, short, default_value = "main")]
     pub local_branch_name: String,
 
@@ -47,6 +49,10 @@ impl MergeCommand {
 
         if !sh.is_clean_repo()? {
             return Err(RepositoryNotCleanError::new().into());
+        }
+
+        if !sh.git_local_branch_exists(&local_branch_name)? {
+            return Err(LocalBranchDoesNotExistError::new(local_branch_name).into());
         }
 
         cmd!(sh, "git checkout {local_branch_name}").run_echo()?;
