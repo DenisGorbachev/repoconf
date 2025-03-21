@@ -46,6 +46,7 @@ impl PropagateCommand {
                 local_branch_strategy: local_branch_name.clone(),
                 remote_branch_strategy: remote_branch_name.clone(),
                 dir: Some(repo.path().to_path_buf()),
+                ..MergeCommand::default()
             };
             merge_command.run().await?;
         }

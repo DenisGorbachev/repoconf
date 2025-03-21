@@ -4,11 +4,14 @@ use itertools::Itertools;
 use std::path::PathBuf;
 use xshell::{cmd, Shell};
 
-#[derive(Parser, Clone, Debug)]
+#[derive(Parser, Default, Clone, Debug)]
 pub struct MergeCommand {
     /// Child repository directory (defaults to current directory)
     #[arg(long, short, value_parser = value_parser!(PathBuf))]
     pub dir: Option<PathBuf>,
+
+    #[arg(long, short)]
+    pub allow_unrelated_histories: bool,
 
     /// Name of the local branch to merge onto
     ///
@@ -33,6 +36,7 @@ impl MergeCommand {
     pub async fn run(self) -> Outcome {
         let Self {
             dir,
+            allow_unrelated_histories,
             local_branch_strategy,
             remote_branch_strategy,
         } = self;
@@ -72,7 +76,12 @@ impl MergeCommand {
         for remote in remotes {
             let remote_branch_name = remote_branch_strategy.to_branch_name(&format!("refs/remotes/{remote}"), &refs)?;
 
-            cmd!(sh, "git merge {remote}/{remote_branch_name}").run_echo()?;
+            let mut flags = vec![];
+            if allow_unrelated_histories {
+                flags.push("--allow-unrelated-histories");
+                flags.push("--no-commit");
+            }
+            cmd!(sh, "git merge {remote}/{remote_branch_name} {flags...}").run_echo()?;
         }
 
         Ok(())
