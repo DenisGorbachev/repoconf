@@ -66,8 +66,10 @@ impl CreateCommand {
         let remote_template_url = template.as_str();
         let visibility_arg = visibility.as_arg();
 
-        let repo_view = cmd!(&sh, "gh repo view {repo_name_full}").output()?;
-        let repo_exists = repo_view.status.success();
+        let repo_view_status = cmd!(&sh, "gh repo view {repo_name_full}")
+            .to_command()
+            .status()?;
+        let repo_exists = repo_view_status.success();
         if repo_exists {
             if !use_existing {
                 return Err(RepositoryAlreadyExists::new(repo_owner, repo_name).into());
