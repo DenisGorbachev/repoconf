@@ -99,9 +99,9 @@ impl CreateCommand {
             cmd!(sh_dir, "git checkout {branch_name}").run_echo()?;
         } else {
             cmd!(sh_dir, "git checkout -b {branch_name} {remote_template_name}/{branch_name}").run_echo()?;
+            cmd!(sh_dir, "git branch --unset-upstream {branch_name}").run_echo()?;
         }
 
-        cmd!(sh_dir, "git branch --unset-upstream {branch_name}").run_echo()?;
         cmd!(sh_dir, "git push --set-upstream {origin_remote_name} {branch_name}").run_echo()?;
 
         if !skip_post_init {
