@@ -42,9 +42,9 @@ impl MergeCommand {
         } = self;
 
         let dir = some_or_current_dir(dir)?;
-        let sh = Shell::new()?.with_current_dir(&dir);
+        let sh_dir = Shell::new()?.with_current_dir(&dir);
 
-        let remotes = sh
+        let remotes = sh_dir
             .git_remote_names()?
             .filter(|name| name.starts_with("repoconf"))
             .collect_vec();
@@ -57,21 +57,21 @@ impl MergeCommand {
 
         let remotes_slice = remotes.as_slice();
 
-        if !sh.is_clean_repo()? {
+        if !sh_dir.is_clean_repo()? {
             return Err(RepositoryNotCleanError::new().into());
         }
 
-        let refs = git_refs(&sh)?;
+        let refs = git_refs(&sh_dir)?;
 
         let local_branch_name = local_branch_strategy.to_branch_name("refs/heads", &refs)?;
 
-        if !sh.git_local_branch_exists(&local_branch_name)? {
+        if !sh_dir.git_local_branch_exists(&local_branch_name)? {
             return Err(LocalBranchDoesNotExistError::new(local_branch_name).into());
         }
 
-        cmd!(sh, "git checkout {local_branch_name}").run_echo()?;
+        cmd!(sh_dir, "git checkout {local_branch_name}").run_echo()?;
 
-        cmd!(sh, "git remote update {remotes_slice...}").run_echo()?;
+        cmd!(sh_dir, "git remote update {remotes_slice...}").run_echo()?;
 
         for remote in remotes {
             let remote_branch_name = remote_branch_strategy.to_branch_name(&format!("refs/remotes/{remote}"), &refs)?;
@@ -81,8 +81,12 @@ impl MergeCommand {
                 flags.push("--allow-unrelated-histories");
                 flags.push("--no-commit");
             }
-            cmd!(sh, "git merge {remote}/{remote_branch_name} {flags...}").run_echo()?;
+            cmd!(sh_dir, "git merge {remote}/{remote_branch_name} {flags...}").run_echo()?;
         }
+
+        // We can `git push` safely because the merges completed successfully
+        // The user can always `git push -f` if something is wrong
+        cmd!(sh_dir, "git push").run_echo()?;
 
         Ok(())
     }
