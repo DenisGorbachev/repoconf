@@ -88,7 +88,14 @@ impl CreateCommand {
             cmd!(sh_cwd, "gh repo clone {repo_name_full} {dir} -- --origin {origin_remote_name}").run_echo()?;
         }
 
-        let sh_dir = sh_cwd.with_current_dir(&dir);
+        let sh_dir = {
+            let mut sh_dir = sh_cwd.with_current_dir(&dir);
+            sh_dir.set_var("REPOCONF_VISIBILITY", visibility.to_string());
+            sh_dir.set_var("REPOCONF_TEMPLATE", template.to_string());
+            sh_dir.set_var("REPOCONF_REPO_OWNER", &repo_owner);
+            sh_dir.set_var("REPOCONF_REPO_NAME", &repo_name);
+            sh_dir
+        };
 
         cmd!(sh_dir, "gh repo set-default {repo_name_full}").run_echo()?;
 

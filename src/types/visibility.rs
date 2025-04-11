@@ -1,6 +1,8 @@
 use clap::ValueEnum;
+use strum::Display;
 
-#[derive(ValueEnum, Ord, PartialOrd, Eq, PartialEq, Default, Hash, Clone, Copy, Debug)]
+#[derive(ValueEnum, Display, Ord, PartialOrd, Eq, PartialEq, Default, Hash, Clone, Copy, Debug)]
+#[strum(serialize_all = "snake_case")]
 pub enum Visibility {
     Public,
     #[default]
