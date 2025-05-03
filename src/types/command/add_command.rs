@@ -1,4 +1,4 @@
-use crate::{some_or_current_dir, Outcome, RepoName};
+use crate::{unwrap_or_current_dir, Outcome, RepoName};
 use clap::{value_parser, Parser};
 use std::path::PathBuf;
 use url::Url;
@@ -22,7 +22,7 @@ impl AddCommand {
             dir,
         } = self;
 
-        let dir = some_or_current_dir(dir)?;
+        let dir = unwrap_or_current_dir(dir)?;
         let sh = Shell::new()?.with_current_dir(dir);
 
         let remote_template_name_suffix = template.repo_name();

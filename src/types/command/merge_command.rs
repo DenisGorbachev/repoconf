@@ -1,4 +1,4 @@
-use crate::{git_refs, some_or_current_dir, BranchNameStrategy, GitLocalBranchExists, GitRemoteNames, IsCleanRepo, LocalBranchDoesNotExistError, Outcome, RepositoryNotCleanError};
+use crate::{git_refs, unwrap_or_current_dir, BranchNameStrategy, GitLocalBranchExists, GitRemoteNames, IsCleanRepo, LocalBranchDoesNotExistError, Outcome, RepositoryNotCleanError};
 use clap::{value_parser, Parser};
 use itertools::Itertools;
 use std::path::PathBuf;
@@ -41,7 +41,7 @@ impl MergeCommand {
             remote_branch_strategy,
         } = self;
 
-        let dir = some_or_current_dir(dir)?;
+        let dir = unwrap_or_current_dir(dir)?;
         let sh_dir = Shell::new()?.with_current_dir(&dir);
 
         let remotes = sh_dir
