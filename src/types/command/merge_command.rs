@@ -10,7 +10,11 @@ pub struct MergeCommand {
     #[arg(long, short, value_parser = value_parser!(PathBuf))]
     pub dir: Option<PathBuf>,
 
-    #[arg(long, short)]
+    /// Run the command even if the repository has uncommitted changes
+    #[arg(long)]
+    pub allow_dirty: bool,
+
+    #[arg(long)]
     pub allow_unrelated_histories: bool,
 
     /// Name of the local branch to merge onto
@@ -36,6 +40,7 @@ impl MergeCommand {
     pub async fn run(self) -> Outcome {
         let Self {
             dir,
+            allow_dirty,
             allow_unrelated_histories,
             local_branch_strategy,
             remote_branch_strategy,
@@ -57,7 +62,7 @@ impl MergeCommand {
 
         let remotes_slice = remotes.as_slice();
 
-        if !sh_dir.is_clean_repo()? {
+        if !allow_dirty && !sh_dir.is_clean_repo()? {
             return Err(RepositoryNotCleanError::new().into());
         }
 
