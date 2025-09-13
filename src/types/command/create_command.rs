@@ -66,11 +66,12 @@ impl CreateCommand {
         let remote_template_url = template.as_str();
         let visibility_arg = visibility.as_arg();
 
-        let repo_view_status = cmd!(&sh_cwd, "gh repo view {repo_name_full}")
-            .to_command()
-            .status()?;
-        let repo_exists = repo_view_status.success();
-        if repo_exists {
+        // TODO: This command fails with "401 Bad Credentials" when invoked through an alias (does it lose the environment?)
+        let repo_view_cmd = cmd!(&sh_cwd, "gh repo view {repo_name_full}");
+        eprintln!("$ {}", &repo_view_cmd);
+        let mut repo_view_command = repo_view_cmd.to_command();
+        let repo_view_output = repo_view_command.output()?;
+        if repo_view_output.status.success() {
             if !use_existing {
                 return Err(RepositoryAlreadyExists::new(repo_owner, repo_name).into());
             }
