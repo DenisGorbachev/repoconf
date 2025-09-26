@@ -7,6 +7,7 @@ command_enum!(
     pub enum Command {
         Add(AddCommand),
         Create(CreateCommand),
+        Init(InitCommand),
         Merge(MergeCommand),
         Propagate(PropagateCommand),
     }
@@ -27,3 +28,7 @@ pub use propagate_command::*;
 mod add_command;
 
 pub use add_command::*;
+
+mod init_command;
+
+pub use init_command::*;

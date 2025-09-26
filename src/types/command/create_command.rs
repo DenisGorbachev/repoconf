@@ -1,4 +1,4 @@
-use crate::{git_remote_add_if_not_exists, DirectoryAlreadyExists, GitLocalBranchExists, Outcome, RepoName, RepositoryAlreadyExists, SetExecutableBit, Visibility};
+use crate::{DirectoryAlreadyExists, InitCommand, Outcome, RepoName, RepositoryAlreadyExists, Visibility};
 use clap::{value_parser, Parser};
 use std::path::PathBuf;
 use url::Url;
@@ -18,9 +18,9 @@ pub struct CreateCommand {
     #[arg(value_enum, long, short)]
     visibility: Visibility,
 
-    /// GitHub template repo URL
+    /// Template repo URL
     #[arg(value_parser = value_parser!(Url))]
-    template: Url,
+    template_url: Url,
 
     /// Owner of the new repository
     #[arg()]
@@ -32,7 +32,7 @@ pub struct CreateCommand {
 
     /// Name of the origin remote
     #[arg(long, short, default_value = "origin")]
-    origin_remote_name: String,
+    remote_name: String,
 
     /// Name of the main branch
     #[arg(long, short, default_value = "main")]
@@ -47,23 +47,21 @@ impl CreateCommand {
     pub async fn run(self) -> Outcome {
         let Self {
             use_existing,
-            skip_post_init,
             visibility,
-            template,
+            template_url,
             repo_owner,
             repo_name,
-            origin_remote_name,
+            remote_name,
             branch_name,
+            skip_post_init,
             dir,
         } = self;
 
         let sh_cwd = Shell::new()?;
 
-        let package_name = &repo_name;
         let repo_name_full = format!("{repo_owner}/{repo_name}");
-        let remote_template_name_suffix = template.repo_name();
-        let remote_template_name = format!("repoconf-{remote_template_name_suffix}");
-        let remote_template_url = template.as_str();
+        // TODO: require passing template_name as arg
+        let template_name = template_url.repo_name().to_string();
         let visibility_arg = visibility.as_arg();
 
         // TODO: This command fails with "401 Bad Credentials" when invoked through an alias (does it lose the environment?)
@@ -86,13 +84,13 @@ impl CreateCommand {
                 return Err(DirectoryAlreadyExists::new(dir).into());
             }
         } else {
-            cmd!(sh_cwd, "gh repo clone {repo_name_full} {dir} -- --origin {origin_remote_name}").run_echo()?;
+            cmd!(sh_cwd, "gh repo clone {repo_name_full} {dir} -- --origin {remote_name}").run_echo()?;
         }
 
         let sh_dir = {
             let mut sh_dir = sh_cwd.with_current_dir(&dir);
             sh_dir.set_var("REPOCONF_VISIBILITY", visibility.to_string());
-            sh_dir.set_var("REPOCONF_TEMPLATE", template.to_string());
+            sh_dir.set_var("REPOCONF_TEMPLATE", template_url.to_string());
             sh_dir.set_var("REPOCONF_REPO_OWNER", &repo_owner);
             sh_dir.set_var("REPOCONF_REPO_NAME", &repo_name);
             sh_dir
@@ -100,27 +98,16 @@ impl CreateCommand {
 
         cmd!(sh_dir, "gh repo set-default {repo_name_full}").run_echo()?;
 
-        git_remote_add_if_not_exists(&sh_dir, &remote_template_name, remote_template_url)?;
-        cmd!(sh_dir, "git remote update {remote_template_name}").run_echo()?;
-
-        if sh_dir.git_local_branch_exists(&branch_name)? {
-            cmd!(sh_dir, "git checkout {branch_name}").run_echo()?;
-        } else {
-            cmd!(sh_dir, "git checkout -b {branch_name} {remote_template_name}/{branch_name}").run_echo()?;
-            cmd!(sh_dir, "git branch --unset-upstream {branch_name}").run_echo()?;
-        }
-
-        cmd!(sh_dir, "git push --set-upstream {origin_remote_name} {branch_name}").run_echo()?;
-
-        if !skip_post_init {
-            let post_init_script = sh_dir.current_dir().join(".repoconf/hooks/post-init.sh");
-            post_init_script.set_executable_bit()?;
-            if sh_dir.path_exists(&post_init_script) {
-                cmd!(sh_cwd, "usage bash {post_init_script} --name {package_name} {dir}").run_interactive()?;
-            } else {
-                eprintln!("Could not find post-init script at {post_init_script}", post_init_script = post_init_script.display());
-            }
-        }
+        let init_cmd = InitCommand {
+            repo_name: repo_name.into(),
+            remote_name,
+            branch_name,
+            skip_post_init,
+            template_name,
+            template_url,
+            dir,
+        };
+        init_cmd.run().await?;
 
         Ok(())
     }

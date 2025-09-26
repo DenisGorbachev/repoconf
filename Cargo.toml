@@ -37,4 +37,4 @@ walkdir = { version = "2.5.0" }
 xshell = { version = "0.3.0-pre.2" }
 
 [package.metadata.cargo-machete]
-ignored = ["derive-new", "fmt-derive", "stub-macro", "standard-traits"]
+ignored = ["stub-macro", "standard-traits"]
