@@ -750,7 +750,7 @@ checksum = "a8f112729512f8e442d81f95a8a7ddf2b7c6b8a1a6f509a95864142b30cab2d3"
 [[package]]
 name = "standard-traits"
 version = "0.1.0"
-source = "git+https://github.com/DenisGorbachev/standard-traits#8f285e69b86c5469a41e7f873eefeb318e561dc5"
+source = "git+https://github.com/DenisGorbachev/standard-traits#bc0b8a3fcbd3d688f06efbd4bb0b8a7798ac2867"
 
 [[package]]
 name = "strsim"
@@ -789,7 +789,7 @@ checksum = "d3ed152e61a12fba5efcbabf2c23b7b456bc34594d9f833dc186738a2811f226"
 [[package]]
 name = "subtype"
 version = "0.1.0"
-source = "git+https://github.com/DenisGorbachev/subtype#254075dead32e2a77e918a85084fa37362eea5ff"
+source = "git+https://github.com/DenisGorbachev/subtype#ec9ae0e60e3b9436fd27148ea53b8725af891939"
 dependencies = [
  "derive_more 1.0.0",
  "pretty-type-name",
