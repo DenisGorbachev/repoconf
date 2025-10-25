@@ -69,6 +69,7 @@ impl CreateCommand {
         eprintln!("$ {}", &repo_view_cmd);
         let mut repo_view_command = repo_view_cmd.to_command();
         let repo_view_output = repo_view_command.output()?;
+        // dbg!(&repo_view_output);
         if repo_view_output.status.success() {
             if !use_existing {
                 return Err(RepositoryAlreadyExists::new(repo_owner, repo_name).into());

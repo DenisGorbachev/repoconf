@@ -77,11 +77,11 @@ impl InitCommand {
 
         if !skip_post_init {
             let post_init_script = sh_dir.current_dir().join(".repoconf/hooks/post-init.sh");
-            post_init_script.set_executable_bit()?;
             if sh_dir.path_exists(&post_init_script) {
+                post_init_script.set_executable_bit()?;
                 cmd!(sh_cwd, "usage bash {post_init_script} --name {repo_name} {dir}").run_interactive()?;
             } else {
-                eprintln!("Could not find post-init script at {post_init_script}", post_init_script = post_init_script.display());
+                eprintln!("[WARN] Could not find post-init script at {post_init_script}", post_init_script = post_init_script.display());
             }
         }
 
