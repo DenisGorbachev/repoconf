@@ -26,3 +26,5 @@ mod branch_name_strategy;
 pub use branch_name_strategy::*;
 mod git_branch_name;
 pub use git_branch_name::*;
+mod unexpected_output;
+pub use unexpected_output::*;

@@ -1,4 +1,4 @@
-use crate::{DirectoryAlreadyExists, InitCommand, Outcome, RepoName, RepositoryAlreadyExists, Visibility};
+use crate::{DirectoryAlreadyExists, InitCommand, Outcome, RepoName, RepositoryAlreadyExists, UnexpectedOutput, Visibility};
 use clap::{value_parser, Parser};
 use std::path::PathBuf;
 use url::Url;
@@ -65,17 +65,27 @@ impl CreateCommand {
         let visibility_arg = visibility.as_arg();
 
         // TODO: This command fails with "401 Bad Credentials" when invoked through an alias (does it lose the environment?)
-        let repo_view_cmd = cmd!(&sh_cwd, "gh repo view {repo_name_full}");
+        let repo_view_cmd = cmd!(&sh_cwd, "gh repo view --json name {repo_name_full}");
         eprintln!("$ {}", &repo_view_cmd);
         let mut repo_view_command = repo_view_cmd.to_command();
         let repo_view_output = repo_view_command.output()?;
-        // dbg!(&repo_view_output);
-        if repo_view_output.status.success() {
-            if !use_existing {
-                return Err(RepositoryAlreadyExists::new(repo_owner, repo_name).into());
+        match repo_view_output.status.code() {
+            Some(0) => {
+                if !use_existing {
+                    return Err(RepositoryAlreadyExists::new(repo_owner, repo_name).into());
+                }
             }
-        } else {
-            cmd!(sh_cwd, "gh repo create {visibility_arg} {repo_name_full}").run_echo()?;
+            Some(1) => {
+                let repository_not_found = repo_view_output
+                    .stderr
+                    .starts_with("GraphQL: Could not resolve to a Repository".as_bytes());
+                if repository_not_found {
+                    cmd!(sh_cwd, "gh repo create {visibility_arg} {repo_name_full}").run_echo()?;
+                } else {
+                    return Err(UnexpectedOutput::new(repo_view_output).into());
+                }
+            }
+            _ => return Err(UnexpectedOutput::new(repo_view_output).into()),
         }
 
         if dir.try_exists()? {
