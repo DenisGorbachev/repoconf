@@ -8,28 +8,20 @@ jobs:
   test:
     name: test
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        rust:
-          - stable
-          - beta
-          - nightly
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - uses: jdx/mise-action@v2
         with:
-          version: 2025.1.14
+          version: 2025.10.11
       - name: Remove rust from mise
         run: |
           # a different rust version will be installed in the next step
           mise rm rust
       - uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: ${{ matrix.rust }}
           components: clippy, rustfmt
-      - uses: Swatinem/rust-cache@v2.7.3
+      - uses: Swatinem/rust-cache@v2.8.0
       - run: lefthook run --force pre-commit
       - run: cargo hack test --feature-powerset
       - uses: wagoid/commitlint-github-action@v6

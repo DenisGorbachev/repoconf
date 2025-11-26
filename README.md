@@ -4,8 +4,6 @@
 
 # A utility CLI for managing configs across repos
 
-[![Build](https://github.com/DenisGorbachev/repoconf/actions/workflows/ci.yml/badge.svg)](https://github.com/DenisGorbachev/repoconf)
-
 ## Installation
 
 Install as executable:
@@ -28,11 +26,12 @@ A utility CLI for managing configs across repos
 Usage: repoconf <COMMAND>
 
 Commands:
-  print   
-  ensure  
-  create  
-  merge   
-  help    Print this message or the help of the given subcommand(s)
+  add        
+  create     
+  init       
+  merge      
+  propagate  
+  help       Print this message or the help of the given subcommand(s)
 
 Options:
   -h, --help     Print help
@@ -45,6 +44,6 @@ Like the project? [⭐ Star this repo](https://github.com/DenisGorbachev/repocon
 
 ## License
 
-[Apache License 2.0](LICENSE-APACHE) or [MIT License](LICENSE-MIT) at your option.
+[Apache-2.0](LICENSE-APACHE) or [MIT](LICENSE-MIT).
 
-Unless you explicitly state otherwise, any contribution intentionally submitted for inclusion in this crate by you, as defined in the Apache-2.0 license, shall be dual licensed as above, without any additional terms or conditions.
+Unless you explicitly state otherwise, any contribution intentionally submitted for inclusion in this crate by you, shall be licensed as above, without any additional terms or conditions.
