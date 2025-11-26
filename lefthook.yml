@@ -8,7 +8,6 @@ pre-commit:
         mise run gen:readme
         # README.md may not be created if `mise run gen:readme` is a stub
         if [ -f README.md ]; then
-          cat README.md
           # run rumdl because README.md has changed
           rumdl fmt README.md
           # add README.md manually instead of using `stage_fixed` because it may not have been staged
