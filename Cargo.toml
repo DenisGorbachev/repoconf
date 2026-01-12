@@ -9,32 +9,50 @@ repository = "https://github.com/DenisGorbachev/repoconf"
 readme = "README.md"
 keywords = []
 categories = []
+exclude = [
+    ".*",
+    "*.local.*",
+    "doc/dev",
+    "specs",
+    "README.ts",
+    "AGENTS*.md",
+    "CLAUDE*.md",
+    "deno.json",
+    "commitlint.config.mjs",
+    "lefthook.yml",
+    "mise.toml",
+    "rumdl.toml",
+    "rustfmt.toml",
+    "yolobox"
+]
 
 [package.metadata.details]
 tagline = ""
 summary = ""
 announcement = ""
-readme = { }
+readme = { generate = false }
 
 [dependencies]
-clap = { version = "4.5.11", features = ["derive"] }
+clap = { version = "4.5.11", features = ["derive", "env"] }
 cli-util = { git = "https://github.com/DenisGorbachev/cli-util" }
 demand = { version = "1.6.4" }
 derive-getters = { version = "0.5.0", features = ["auto_copy_getters"] }
 derive-new = "0.7.0"
-derive_more = { version = "2.0.1", features = ["full"] }
+derive_more = { version = "2.1.1", features = ["full"] }
+errgonomic = { git = "https://github.com/DenisGorbachev/errgonomic" }
 fmt-derive = "0.1.2"
 helpful = { git = "https://github.com/DenisGorbachev/helpful" }
 itertools = { version = "0.14.0" }
-not-found-error = { version = "0.2.3" }
+not-found-error = "0.2.3"
 standard-traits = { git = "https://github.com/DenisGorbachev/standard-traits" }
-strum = { version = "0.27.1", features = ["derive"] }
-stub-macro = { version = "0.1.3" }
+strum = { version = "0.27.2", features = ["derive"] }
+stub-macro = { version = "0.2.1" }
 subtype = { git = "https://github.com/DenisGorbachev/subtype" }
+thiserror = "2.0.17"
 tokio = { version = "1.39.2", features = ["macros", "fs", "net", "rt", "rt-multi-thread"] }
 url = "2.5.4"
 walkdir = { version = "2.5.0" }
 xshell = { version = "0.3.0-pre.2" }
 
 [package.metadata.cargo-machete]
-ignored = ["stub-macro", "standard-traits"]
+ignored = ["stub-macro", "standard-traits", "errgonomic", "thiserror", "strum"]

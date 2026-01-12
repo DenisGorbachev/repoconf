@@ -18,13 +18,15 @@ exclude = [
     "dist",
     "build",
     "target",
-    "doc/dev",
     "CHANGELOG.md",
+    "AGENTS.md",
 ]
 
 # Markdown flavor/dialect
 # TODO: Switch to "gfm" when rumdl implements it
 flavor = "standard"
+
+cache-dir = ".cache/rumdl"
 
 # Rule-specific configurations (uncomment and modify as needed)
 

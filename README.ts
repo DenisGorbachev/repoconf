@@ -1,4 +1,4 @@
-#!/usr/bin/env -S deno run --allow-write --allow-read --allow-run=bash,git,cargo --allow-net=docs.rs:443 --allow-env --allow-sys --no-lock
+#!/usr/bin/env -S deno run --allow-write --allow-read --allow-run=bash,git,cargo --allow-net=docs.rs:443,github.com:443 --allow-env --allow-sys --no-lock
 
 // NOTE: Pin the versions of the packages because the script runs without a lock file
 import * as zx from "npm:zx@8.3.2"
@@ -51,13 +51,6 @@ const CargoMetadataSchema = z.object({
 
 type CargoMetadata = z.infer<typeof CargoMetadataSchema>
 
-const GitHubRepoSchema = z.object({
-  url: z.string().url(),
-  visibility: z.enum(["PUBLIC", "PRIVATE"]),
-})
-
-type GitHubRepo = z.infer<typeof GitHubRepoSchema>
-
 const BadgeSchema = z.object({
   name: z.string().min(1),
   image: z.string().url(),
@@ -92,6 +85,7 @@ const stub = <T>(message = "Implement me"): T => {
  * Examples:
  *
  * `normalizeGitRemoteUrl("git@github.com:DenisGorbachev/rust-private-template.git") == "https://github.com/DenisGorbachev/rust-private-template"`
+ * `normalizeGitRemoteUrl("https://github.com/DenisGorbachev/rust-private-template.git") == "https://github.com/DenisGorbachev/rust-private-template"`
  *
  * @param url
  */
@@ -103,7 +97,14 @@ const normalizeGitRemoteUrl = (url: string) => {
     return `https://github.com/${username}/${repo}`
   }
 
-  // Return original if not a GitHub SSH URL
+  // Handle GitHub HTTPS format: https://github.com/username/repo(.git)
+  const httpsMatch = url.match(/^https:\/\/github\.com\/([^/]+)\/([^/]+?)(?:\.git)?\/?$/)
+  if (httpsMatch) {
+    const [, username, repo] = httpsMatch
+    return `https://github.com/${username}/${repo}`
+  }
+
+  // Return original if not a GitHub URL we recognize
   return url
 }
 
@@ -158,56 +159,33 @@ const primaryTargets = [primaryTarget, primaryBinTarget]
 const secondaryTargets = thePackageMetadata.targets.filter((t) => !primaryTargets.includes(t))
 const secondaryBinTargets = secondaryTargets.filter((t) => t.kind.includes("bin"))
 const docsUrl = `https://docs.rs/${name}`
-const doc2ReadmeTemplate = `
-{{ readme }}
-
-{%- if links != "" %}
-  {{ links }}
-{%- endif -%}
-`.trimStart()
-const doc2readmeRender = async (target: string) => {
-  const templatePath = await Deno.makeTempFile({
-    prefix: "README",
-    suffix: "jl",
-  })
-  await Deno.writeTextFile(
-    templatePath,
-    doc2ReadmeTemplate,
-  )
-  return $`cargo doc2readme --template ${templatePath} --target-name ${target} --out -`
-}
-
-const doc2ReadmePromise = doc2readmeRender(primaryTarget.name)
+const crateDocsPlaceholder = `
+<!-- crate documentation start -->
+<!-- crate documentation end -->
+`.trim()
 const docsUrlPromise = fetch(docsUrl, {method: "HEAD"})
 const helpPromise = primaryBinTarget ? $`cargo run --quiet --bin ${primaryBinTarget.name} -- --help` : undefined
-const ghRepoViewPromise = $`gh repo view --json url,visibility ${theOriginUrl}`.nothrow().quiet()
-
-const doc = await doc2ReadmePromise
-const docStr = doc.stdout.trim()
+const isPublicGitHubRepoPromise = (async () => {
+  if (!theOriginUrl.startsWith("https://github.com")) return false
+  const response = await fetch(theOriginUrl, {method: "GET"})
+  if (response.status === 200) return true
+  if (response.status === 404) return false
+  throw new Error(`Unexpected response status while checking GitHub repo visibility: ${response.status} ${response.statusText}`)
+})()
 
 const docsUrlHead = await docsUrlPromise
 const docsUrlIs200 = docsUrlHead.status === 200
 
 // Hack: await the promise instead of calling `then` because `then` has incorrect type in `zx`
-const theGitHubRepo = await (async () => {
-  const output = await ghRepoViewPromise
-  if (output.exitCode === 0) {
-    return parse(GitHubRepoSchema, output)
-  } else {
-    const text = output.text()
-    if (text.includes('argument error: expected the "[HOST/]OWNER/REPO" format')) {
-      return null
-    } else {
-      throw new Error("Failure in ghRepoViewPromise: \n" + text)
-    }
-  }
-})()
-const isGitHubRepo = theGitHubRepo !== null
-const isPublicGitHubRepo = isGitHubRepo && theGitHubRepo.visibility === "PUBLIC"
+const insertCrateDocsIntoReadme = async (readmePath: string) => {
+  await $`cargo insert-docs crate-into-readme --allow-dirty --link-to-latest --shrink-headings 0 --readme-path ${readmePath}`
+}
+
+const isPublicGitHubRepo = await isPublicGitHubRepoPromise
 
 const badges: Badge[] = []
 if (isPublicGitHubRepo) {
-  badge("Build", `${theCargoToml.package.repository}/actions/workflows/ci.yml/badge.svg`, theCargoToml.package.repository)
+  badges.push(badge("Build", `${theCargoToml.package.repository}/actions/workflows/ci.yml/badge.svg`, theCargoToml.package.repository))
 }
 if (docsUrlIs200) {
   badges.push(badge("Documentation", `https://docs.rs/${name}/badge.svg`, docsUrl))
@@ -230,7 +208,7 @@ const renderShellCode = (code: string) => `\`\`\`shell\n${code}\n\`\`\``
 
 const titleSectionBodyParts = [
   badgesStr,
-  docStr,
+  crateDocsPlaceholder,
 ].filter((s) => s.length)
 const titleSectionBody = titleSectionBodyParts.join("\n\n")
 
@@ -289,6 +267,15 @@ const content = contentArray.filter(s => s.length > 0).join("\n\n");
 
 if (args.output) {
   await Deno.writeTextFile(args.output, content + "\n")
+  await insertCrateDocsIntoReadme(args.output)
 } else {
-  console.info(content)
+  const tempReadmePath = await Deno.makeTempFile({
+    prefix: "README",
+    suffix: ".md",
+  })
+  await Deno.writeTextFile(tempReadmePath, content + "\n")
+  await insertCrateDocsIntoReadme(tempReadmePath)
+  const readme = await Deno.readTextFile(tempReadmePath)
+  await Deno.remove(tempReadmePath)
+  console.info(readme.trimEnd())
 }
