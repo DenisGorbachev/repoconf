@@ -8,11 +8,13 @@
 
 #![allow(dead_code)]
 
+use errgonomic::handle;
 use std::fs::read_dir;
 use std::io;
 use std::marker::PhantomData;
 use std::path::{Path, PathBuf};
 use subtype::subtype_path_buf;
+use thiserror::Error;
 
 pub struct Valid<Value, Validator> {
     value: Value,
@@ -43,9 +45,17 @@ pub fn is_utf8(path: &Path) -> bool {
 }
 
 // Some checks can be fallible, which adds another layer of complexity (we don't want to hide the errors from the caller)
-pub fn is_non_empty(path: &Path) -> io::Result<bool> {
-    let mut entries = read_dir(path)?;
+pub fn is_non_empty(path: &Path) -> Result<bool, IsNonEmptyError> {
+    use IsNonEmptyError::*;
+    let path = path.to_path_buf();
+    let mut entries = handle!(read_dir(&path), ReadDirFailed, path);
     Ok(entries.next().is_some())
+}
+
+#[derive(Error, Debug)]
+pub enum IsNonEmptyError {
+    #[error("failed to read directory '{path}'")]
+    ReadDirFailed { source: io::Error, path: PathBuf },
 }
 
 // sigil struct

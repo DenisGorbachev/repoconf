@@ -1,20 +1,19 @@
+use errgonomic::handle;
 use std::fs::{metadata, set_permissions};
 use std::io;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
+use thiserror::Error;
 
 pub trait SetExecutableBit {
-    type Output;
-
-    fn set_executable_bit(self) -> Self::Output;
+    fn set_executable_bit(self) -> Result<(), SetExecutableBitError>;
 }
 
 impl SetExecutableBit for &Path {
-    type Output = io::Result<()>;
-
-    fn set_executable_bit(self) -> Self::Output {
-        // Retrieve file metadata
-        let metadata = metadata(self)?;
+    fn set_executable_bit(self) -> Result<(), SetExecutableBitError> {
+        use SetExecutableBitError::*;
+        let path = self.to_path_buf();
+        let metadata = handle!(metadata(&path), MetadataFailed, path);
 
         // Get current permissions
         let mut permissions = metadata.permissions();
@@ -24,14 +23,21 @@ impl SetExecutableBit for &Path {
         permissions.set_mode(mode);
 
         // Apply new permissions
-        set_permissions(self, permissions)
+        handle!(set_permissions(&path, permissions), SetPermissionsFailed, path);
+        Ok(())
     }
 }
 
-impl<'a> SetExecutableBit for &'a PathBuf {
-    type Output = <&'a Path as SetExecutableBit>::Output;
-
-    fn set_executable_bit(self) -> Self::Output {
+impl SetExecutableBit for &PathBuf {
+    fn set_executable_bit(self) -> Result<(), SetExecutableBitError> {
         self.as_path().set_executable_bit()
     }
+}
+
+#[derive(Error, Debug)]
+pub enum SetExecutableBitError {
+    #[error("failed to read metadata for '{path}'")]
+    MetadataFailed { source: io::Error, path: PathBuf },
+    #[error("failed to set permissions for '{path}'")]
+    SetPermissionsFailed { source: io::Error, path: PathBuf },
 }

@@ -1648,9 +1648,9 @@ derive-new = "0.7.0"
 derive_more = { version = "2.1.1", features = ["full"] }
 errgonomic = { git = "https://github.com/DenisGorbachev/errgonomic" }
 fmt-derive = "0.1.2"
+futures = "0.3.31"
 helpful = { git = "https://github.com/DenisGorbachev/helpful" }
 itertools = { version = "0.14.0" }
-not-found-error = "0.2.3"
 standard-traits = { git = "https://github.com/DenisGorbachev/standard-traits" }
 strum = { version = "0.27.2", features = ["derive"] }
 stub-macro = { version = "0.2.1" }
@@ -1669,22 +1669,27 @@ ignored = ["stub-macro", "standard-traits", "errgonomic", "thiserror", "strum"]
 
 ```rust
 use clap::Parser;
-use repoconf::{Cli, Outcome};
+use errgonomic::exit_result;
+use repoconf::Command;
+use std::process::ExitCode;
 
 #[tokio::main]
-async fn main() -> Outcome {
-    let args = Cli::parse();
-    args.run().await
+async fn main() -> ExitCode {
+    let args = Command::parse();
+    let result = args.run().await;
+    exit_result(result)
+}
+
+#[test]
+fn verify_cli() {
+    use clap::CommandFactory;
+    Command::command().debug_assert();
 }
 ```
 
 ### src/lib.rs
 
 ```rust
-// mod command;
-//
-// pub use command::*;
-
 mod types;
 
 pub use types::*;
@@ -1700,4 +1705,8 @@ pub use functions::*;
 mod experimental_validation;
 
 pub use experimental_validation::*;
+
+mod command;
+
+pub use command::*;
 ```

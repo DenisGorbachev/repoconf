@@ -1,8 +1,17 @@
 use clap::Parser;
-use repoconf::{Cli, Outcome};
+use errgonomic::exit_result;
+use repoconf::Command;
+use std::process::ExitCode;
 
 #[tokio::main]
-async fn main() -> Outcome {
-    let args = Cli::parse();
-    args.run().await
+async fn main() -> ExitCode {
+    let args = Command::parse();
+    let result = args.run().await;
+    exit_result(result)
+}
+
+#[test]
+fn verify_cli() {
+    use clap::CommandFactory;
+    Command::command().debug_assert();
 }

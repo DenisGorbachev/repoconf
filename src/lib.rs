@@ -1,7 +1,3 @@
-// mod command;
-//
-// pub use command::*;
-
 mod types;
 
 pub use types::*;
@@ -17,3 +13,7 @@ pub use functions::*;
 mod experimental_validation;
 
 pub use experimental_validation::*;
+
+mod command;
+
+pub use command::*;

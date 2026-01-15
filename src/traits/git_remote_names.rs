@@ -1,18 +1,17 @@
 use crate::GitRemoteName;
+use errgonomic::handle;
 use itertools::Itertools;
+use thiserror::Error;
 use xshell::{cmd, Shell};
 
 pub trait GitRemoteNames {
-    type Error;
-
-    fn git_remote_names(&self) -> Result<impl Iterator<Item = GitRemoteName>, Self::Error>;
+    fn git_remote_names(&self) -> Result<impl Iterator<Item = GitRemoteName>, GitRemoteNamesError>;
 }
 
 impl GitRemoteNames for Shell {
-    type Error = xshell::Error;
-
-    fn git_remote_names(&self) -> Result<impl Iterator<Item = GitRemoteName>, Self::Error> {
-        let output = cmd!(self, "git remote").read()?;
+    fn git_remote_names(&self) -> Result<impl Iterator<Item = GitRemoteName>, GitRemoteNamesError> {
+        use GitRemoteNamesError::*;
+        let output = handle!(cmd!(self, "git remote").read(), ReadFailed);
         let iter = output
             .lines()
             .map(ToString::to_string)
@@ -20,4 +19,10 @@ impl GitRemoteNames for Shell {
             .into_iter();
         Ok(iter)
     }
+}
+
+#[derive(Error, Debug)]
+pub enum GitRemoteNamesError {
+    #[error("failed to read git remote names")]
+    ReadFailed { source: xshell::Error },
 }
