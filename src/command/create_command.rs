@@ -2,7 +2,7 @@ use crate::{InitCommand, InitCommandRunError, RepoName, Visibility};
 use clap::{value_parser, Parser};
 use errgonomic::{handle, handle_bool};
 use std::path::PathBuf;
-use std::process::Output;
+use std::process::{ExitCode, Output};
 use thiserror::Error;
 use url::Url;
 use xshell::{cmd, Shell};
@@ -47,7 +47,7 @@ pub struct CreateCommand {
 }
 
 impl CreateCommand {
-    pub async fn run(self) -> Result<(), CreateCommandRunError> {
+    pub async fn run(self) -> Result<ExitCode, CreateCommandRunError> {
         use CreateCommandRunError::*;
         let Self {
             use_existing,
@@ -127,7 +127,7 @@ impl CreateCommand {
         };
         handle!(init_cmd.run().await, InitCommandRunFailed, repo_name_full);
 
-        Ok(())
+        Ok(ExitCode::SUCCESS)
     }
 }
 

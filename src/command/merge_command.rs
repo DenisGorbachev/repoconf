@@ -3,6 +3,7 @@ use clap::{value_parser, Parser};
 use errgonomic::{handle, handle_bool};
 use itertools::Itertools;
 use std::path::PathBuf;
+use std::process::ExitCode;
 use thiserror::Error;
 use xshell::{cmd, Shell};
 
@@ -39,7 +40,7 @@ pub struct MergeCommand {
 }
 
 impl MergeCommand {
-    pub async fn run(self) -> Result<(), MergeCommandRunError> {
+    pub async fn run(self) -> Result<ExitCode, MergeCommandRunError> {
         use MergeCommandRunError::*;
         let Self {
             dir,
@@ -58,7 +59,7 @@ impl MergeCommand {
 
         // NOTE: [`PropagateCommand`] relies on this behavior
         if remotes.is_empty() {
-            return Ok(());
+            return Ok(ExitCode::SUCCESS);
         }
 
         let is_clean = handle!(sh_dir.is_clean_repo(), IsCleanRepoFailed);
@@ -93,7 +94,7 @@ impl MergeCommand {
 
         handle!(cmd!(sh_dir, "git push").run_echo(), GitPushFailed);
 
-        Ok(())
+        Ok(ExitCode::SUCCESS)
     }
 
     fn merge_remotes(sh_dir: &Shell, remotes: Vec<String>, remote_branch_strategy: &BranchNameStrategy, refs: &[String], allow_unrelated_histories: bool) -> Result<(), MergeCommandMergeRemotesError> {

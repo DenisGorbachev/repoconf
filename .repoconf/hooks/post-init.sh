@@ -24,7 +24,7 @@ fi
 (
   cd "$dir"
 
-  files=("README.md" "LICENSE-APACHE" "LICENSE-MIT")
+  files=("README.md")
   for file in "${files[@]}"; do
     if [[ -f "$file" ]]; then
       rm "$file"
@@ -33,6 +33,7 @@ fi
 
   mise trust
   mise install
+  mise reshim
 
   name_old=$(taplo get -f "$cargo_toml" "package.name")
   name_old_snake_case=$(ccase --to snake "$name_old")
@@ -56,5 +57,5 @@ fi
   mise run test
 
   git add .
-  git commit -a -m "chore: update package details"
+  git -C "$dir" commit -a -m "chore: update package details"
 )

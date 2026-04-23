@@ -12,7 +12,7 @@
 ### File `src/main.rs`
 
 - Must define a `main` entrypoint
-- Must define a basic test for the top-level command
+- Must define a `verify_cli` test for the top-level command exactly as in the example below (with `debug_assert`)
 
 Example:
 
@@ -44,6 +44,7 @@ fn verify_cli() {
 Example:
 
 ```rust
+use std::process::ExitCode;
 use Subcommand::*;
 use errgonomic::map_err;
 use thiserror::Error;
@@ -61,7 +62,7 @@ pub enum Subcommand {
 }
 
 impl Command {
-    pub async fn run(self) -> Result<(), CommandRunError> {
+    pub async fn run(self) -> Result<ExitCode, CommandRunError> {
         use CommandRunError::*;
         let Self {
             subcommand,
@@ -94,7 +95,7 @@ A struct that contains fields for CLI arguments.
 - Must be attached to a parent module: if it's a top-level command: `src/lib.rs`, else: `src/command.rs`
 - May contain a `subcommand` field annotated with `#[command(subcommand)]`
 - Must have a `pub async fn run`
-  - Must return a `Result`
+  - Must return a `Result` with `ExitCode`
   - If it contains a `subcommand` field: must match on `subcommand` and call `run` of each command
 
 Command example:
@@ -116,3 +117,12 @@ Subcommand example:
 
 - Name: `DbDownloadSubcommand`
 - File: `src/cli/db_command/db_download_command.rs` (same file as its parent `DbDownloadCommand`)
+
+### Proxy command-like struct
+
+A [command-like struct](#command-like-struct) that has a `subcommand` field and calls `run` on each subcommand.
+
+Proxy command example:
+
+- Name: `DbCommand`
+- File: `src/command/db_command.rs` (attached to `src/command.rs`)

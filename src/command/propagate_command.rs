@@ -4,6 +4,7 @@ use errgonomic::{handle, handle_iter, map_err, ErrVec};
 use futures::stream::{self, TryStreamExt};
 use itertools::Itertools;
 use std::path::PathBuf;
+use std::process::ExitCode;
 use thiserror::Error;
 use walkdir::WalkDir;
 
@@ -31,7 +32,7 @@ pub struct PropagateCommand {
 }
 
 impl PropagateCommand {
-    pub async fn run(self) -> Result<(), PropagateCommandRunError> {
+    pub async fn run(self) -> Result<ExitCode, PropagateCommandRunError> {
         use PropagateCommandRunError::*;
         let Self {
             local_branch_name,
@@ -42,7 +43,7 @@ impl PropagateCommand {
         let repos = handle!(Self::collect_repos(&dir), CollectReposFailed, dir);
         handle!(Self::merge_repos(repos, local_branch_name, remote_branch_name).await, MergeReposFailed);
 
-        Ok(())
+        Ok(ExitCode::SUCCESS)
     }
 
     fn collect_repos(dir: &PathBuf) -> Result<Vec<PathBuf>, PropagateCommandCollectReposError> {
@@ -71,7 +72,7 @@ impl PropagateCommand {
                 dir: Some(repo),
                 ..MergeCommand::default()
             };
-            map_err!(merge_command.run().await, MergeCommandRunFailed)
+            map_err!(merge_command.run().await, MergeCommandRunFailed).map(|_| ())
         })
         .await
     }

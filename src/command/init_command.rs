@@ -2,6 +2,7 @@ use crate::{git_remote_exists, GitLocalBranchExists, GitLocalBranchExistsError, 
 use clap::{value_parser, Parser};
 use errgonomic::{handle, handle_opt};
 use std::path::PathBuf;
+use std::process::ExitCode;
 use thiserror::Error;
 use url::Url;
 use xshell::{cmd, Shell};
@@ -38,7 +39,7 @@ pub struct InitCommand {
 }
 
 impl InitCommand {
-    pub async fn run(self) -> Result<(), InitCommandRunError> {
+    pub async fn run(self) -> Result<ExitCode, InitCommandRunError> {
         use InitCommandRunError::*;
         let Self {
             repo_name,
@@ -110,7 +111,7 @@ impl InitCommand {
             }
         }
 
-        Ok(())
+        Ok(ExitCode::SUCCESS)
     }
 }
 

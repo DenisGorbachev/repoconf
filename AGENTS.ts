@@ -1,12 +1,13 @@
-#!/usr/bin/env -S deno run --allow-read --allow-write --no-lock
+#!/usr/bin/env -S deno run --node-modules-dir=false --allow-read --allow-write --allow-run --no-lock
 
 import {parseArgs} from "jsr:@std/cli@1.0.13"
+import {compare, parse} from "jsr:@std/semver@1.0.0"
 import {stringify} from "jsr:@libs/xml@7.0.3"
 import remarkHeadingShift from "npm:remark-heading-shift@1.1.2"
 import remarkParse from "npm:remark-parse@11.0.0"
 import remarkStringify from "npm:remark-stringify@11.0.0"
 import {unified} from "npm:unified@11.0.5"
-import {extname} from "jsr:@std/path@1.1.4"
+import {dirname, extname, fromFileUrl, join} from "jsr:@std/path@1.1.4"
 
 const args = parseArgs(Deno.args, {
   string: ["output"],
@@ -90,10 +91,161 @@ const renderXmlFile = (path: string, contents: string) =>
 
 const includeFile = async (path: string) => {
   const contents = await Deno.readTextFile(resolvePath(path))
+  return await renderFileContents(path, contents)
+}
+
+const renderFileContents = async (path: string, contents: string, pathToRender: string = path) => {
   if (isMarkdownPath(path)) {
     return await shiftHeadings(contents)
   }
-  return renderCodeFile(path, contents)
+  return renderCodeFile(pathToRender, contents)
+}
+
+const runAgentDocsList = async (): Promise<string[]> => {
+  const decoder = new TextDecoder()
+  const command = new Deno.Command("mise", {
+    args: ["run", "agent:docs:list"],
+    stdout: "piped",
+    stderr: "inherit",
+    cwd: fromFileUrl(rootUrl),
+  })
+  const output = await command.output()
+  const stdout = decoder.decode(output.stdout).trimEnd()
+  if (stdout.length === 0) {
+    return []
+  }
+  return stdout.split(/\r?\n/).filter((line) => line.length > 0)
+}
+
+const includeAgentDocs = async () => {
+  const files = await runAgentDocsList()
+  if (files.length) {
+    return `# Extra docs
+
+Read the extra docs from the list below if they are relevant to your current task:
+
+${files.map(file => `* ${file}`).join("\n")}`.trim()
+  } else {
+    return ""
+  }
+}
+
+type CargoMetadata = {
+  packages: CargoPackage[]
+  resolve: CargoResolve | null
+}
+
+type CargoResolve = {
+  root: string | null
+  nodes: CargoNode[]
+}
+
+type CargoNode = {
+  id: string
+  deps: CargoDependency[]
+}
+
+type CargoDependency = {
+  name: string
+  pkg: string
+}
+
+type CargoPackage = {
+  id: string
+  name: string
+  version: string
+  manifest_path: string
+}
+
+const loadCargoMetadata = (() => {
+  let cached: Promise<CargoMetadata> | null = null
+  const decoder = new TextDecoder()
+  return () => {
+    if (!cached) {
+      cached = (async () => {
+        const command = new Deno.Command("cargo", {
+          args: ["metadata", "--format-version=1"],
+          stdout: "piped",
+          stderr: "piped",
+        })
+        const output = await command.output()
+        if (!output.success) {
+          const stderr = decoder.decode(output.stderr).trim()
+          throw new Error(`cargo metadata failed${stderr ? `: ${stderr}` : ""}`)
+        }
+        return JSON.parse(decoder.decode(output.stdout)) as CargoMetadata
+      })()
+    }
+    return cached
+  }
+})()
+
+const cargoMetadataPromise = loadCargoMetadata()
+
+const parseSemVer = (value: string) => {
+  const parsed = parse(value)
+  if (!parsed) {
+    throw new Error(`invalid semver: '${value}'`)
+  }
+  return parsed
+}
+
+const rootPackageHasDependency = (metadata: CargoMetadata, dependencyName: string) => {
+  const resolve = metadata.resolve
+  if (!resolve?.root) {
+    return false
+  }
+  const rootNode = resolve.nodes.find((node) => node.id === resolve.root)
+  if (!rootNode) {
+    return false
+  }
+  return rootNode.deps.some((dep) => {
+    if (dep.name === dependencyName) {
+      return true
+    }
+    const pkg = metadata.packages.find((candidate) => candidate.id === dep.pkg)
+    return pkg?.name === dependencyName
+  })
+}
+
+const includeFileIfCargoDependencyExists = async (dependencyName: string, path: string) => {
+  const metadata = await cargoMetadataPromise
+  if (!rootPackageHasDependency(metadata, dependencyName)) {
+    return null
+  }
+  return await includeFile(path)
+}
+
+const includeCargoDependencyFileIfExists = async (dependencyName: string, path: string) => {
+  const metadata = await cargoMetadataPromise
+  const candidates = metadata.packages.filter((pkg) => pkg.name === dependencyName)
+  if (candidates.length === 0) {
+    return null
+  }
+  const cargoPackage = candidates.reduce((best, current) => {
+    if (!best) {
+      return current
+    }
+    const comparison = compare(parseSemVer(current.version), parseSemVer(best.version))
+    if (comparison > 0) {
+      return current
+    }
+    if (comparison === 0 && current.manifest_path > best.manifest_path) {
+      return current
+    }
+    return best
+  }, null as CargoPackage | null)
+  if (!cargoPackage) {
+    throw new Error(`cargo package not found for dependency: '${dependencyName}'`)
+  }
+  const crateRoot = dirname(cargoPackage.manifest_path)
+  const fullPath = join(crateRoot, path)
+  const exists = await fileExists(fullPath)
+  if (!exists) {
+    return null
+  }
+  const contents = await Deno.readTextFile(fullPath)
+  return await renderFileContents(path, contents, `${dependencyName}/${path}`)
 }
 
 const includeFileIfExists = async (path: string) => {
@@ -108,10 +260,13 @@ const parts = (await Promise.all([
   Promise.resolve("<!-- This file is autogenerated by AGENTS.ts -->"),
   Promise.resolve("# Guidelines"),
   includeFile(".agents/general.md"),
+  includeFileIfCargoDependencyExists("serde", ".agents/crates/serde.md"),
+  includeFileIfCargoDependencyExists("subtype", ".agents/crates/subtype.md"),
   includeFileIfExists(".agents/project.md"),
   includeFileIfExists(".agents/knowledge.md"),
+  includeFileIfExists(".agents/docs.md"),
   includeFileIfExists(".agents/gotchas.md"),
-  includeFile(".agents/error-handling.md"),
+  includeCargoDependencyFileIfExists("errgonomic", "DOCS.md"),
   includeFile(".agents/cli.md"),
   Promise.resolve("## Project files"),
   includeFile("Cargo.toml"),

@@ -2,6 +2,7 @@ use crate::{unwrap_or_current_dir, RepoName, UnwrapOrCurrentDirError};
 use clap::{value_parser, Parser};
 use errgonomic::handle;
 use std::path::PathBuf;
+use std::process::ExitCode;
 use thiserror::Error;
 use url::Url;
 use xshell::{cmd, Shell};
@@ -18,7 +19,7 @@ pub struct AddCommand {
 }
 
 impl AddCommand {
-    pub async fn run(self) -> Result<(), AddCommandRunError> {
+    pub async fn run(self) -> Result<ExitCode, AddCommandRunError> {
         use AddCommandRunError::*;
         let Self {
             template,
@@ -41,7 +42,7 @@ impl AddCommand {
         );
         handle!(cmd!(sh, "git remote update {remote_template_name}").run_echo(), GitRemoteUpdateFailed, remote_template_name);
 
-        Ok(())
+        Ok(ExitCode::SUCCESS)
     }
 }
 

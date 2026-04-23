@@ -23,7 +23,7 @@ exclude = [
     "mise.toml",
     "rumdl.toml",
     "rustfmt.toml",
-    "yolobox"
+    ".yolobox"
 ]
 
 [package.metadata.details]
@@ -45,14 +45,11 @@ futures = "0.3.31"
 helpful = { git = "https://github.com/DenisGorbachev/helpful" }
 itertools = { version = "0.14.0" }
 standard-traits = { git = "https://github.com/DenisGorbachev/standard-traits" }
-strum = { version = "0.27.2", features = ["derive"] }
-stub-macro = { version = "0.2.1" }
+strum = { version = "0.28.0", features = ["derive"] }
+stub-macro = { version = "0.3.0" }
 subtype = { git = "https://github.com/DenisGorbachev/subtype" }
 thiserror = "2.0.17"
 tokio = { version = "1.39.2", features = ["macros", "fs", "net", "rt", "rt-multi-thread"] }
 url = "2.5.4"
 walkdir = { version = "2.5.0" }
 xshell = { version = "0.3.0-pre.2" }
-
-[package.metadata.cargo-machete]
-ignored = ["stub-macro", "standard-traits", "errgonomic", "thiserror", "strum"]
