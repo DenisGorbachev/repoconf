@@ -20,6 +20,10 @@ pub struct MergeCommand {
     #[arg(long)]
     pub allow_unrelated_histories: bool,
 
+    /// Do not push merged changes after merging
+    #[arg(long)]
+    pub no_push: bool,
+
     /// Name of the local branch to merge onto
     ///
     /// If you pass "-", the command will determine the branch automatically: use "main" if exists, use "master" if exists.
@@ -46,6 +50,7 @@ impl MergeCommand {
             dir,
             allow_dirty,
             allow_unrelated_histories,
+            no_push,
             local_branch_strategy,
             remote_branch_strategy,
         } = self;
@@ -92,7 +97,9 @@ impl MergeCommand {
 
         handle!(Self::merge_remotes(&sh_dir, remotes, &remote_branch_strategy, &refs, allow_unrelated_histories), MergeRemotesFailed);
 
-        handle!(cmd!(sh_dir, "git push").run_echo(), GitPushFailed);
+        if !no_push {
+            handle!(cmd!(sh_dir, "git push").run_echo(), GitPushFailed);
+        }
 
         Ok(ExitCode::SUCCESS)
     }
