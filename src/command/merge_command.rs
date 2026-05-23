@@ -24,6 +24,10 @@ pub struct MergeCommand {
     #[arg(long)]
     pub no_push: bool,
 
+    /// Do not update template remotes before merging
+    #[arg(long)]
+    pub no_remote_update: bool,
+
     /// Name of the local branch to merge onto
     ///
     /// If you pass "-", the command will determine the branch automatically: use "main" if exists, use "master" if exists.
@@ -51,6 +55,7 @@ impl MergeCommand {
             allow_dirty,
             allow_unrelated_histories,
             no_push,
+            no_remote_update,
             local_branch_strategy,
             remote_branch_strategy,
         } = self;
@@ -93,7 +98,9 @@ impl MergeCommand {
         );
 
         let remotes_slice = remotes.as_slice();
-        handle!(cmd!(sh_dir, "git remote update {remotes_slice...}").run_echo(), GitRemoteUpdateFailed, remotes);
+        if !no_remote_update {
+            handle!(cmd!(sh_dir, "git remote update {remotes_slice...}").run_echo(), GitRemoteUpdateFailed, remotes);
+        }
 
         handle!(Self::merge_remotes(&sh_dir, remotes, &remote_branch_strategy, &refs, allow_unrelated_histories), MergeRemotesFailed);
 
