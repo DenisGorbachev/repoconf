@@ -1,8 +1,8 @@
 use crate::{BranchNameStrategyValueParser, GitBranchName};
+use BranchNameStrategy::*;
 use clap::builder::ValueParserFactory;
 use errgonomic::handle_opt;
 use thiserror::Error;
-use BranchNameStrategy::*;
 
 #[derive(Default, Ord, PartialOrd, Eq, PartialEq, Hash, Clone, Debug)]
 pub enum BranchNameStrategy {

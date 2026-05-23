@@ -1,7 +1,7 @@
 use errgonomic::handle;
 use itertools::Itertools;
 use thiserror::Error;
-use xshell::{cmd, Shell};
+use xshell::{Shell, cmd};
 
 pub fn git_refs(sh: &Shell) -> Result<Vec<String>, GitRefsError> {
     use GitRefsError::*;

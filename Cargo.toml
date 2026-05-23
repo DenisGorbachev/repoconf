@@ -1,7 +1,8 @@
 [package]
 name = "repoconf"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
+rust-version = "1.93.1"
 license = "Apache-2.0 OR MIT"
 description = "A utility CLI for managing configs across repos"
 homepage = "https://github.com/DenisGorbachev/repoconf"
@@ -34,19 +35,14 @@ readme = { generate = false }
 
 [dependencies]
 clap = { version = "4.5.11", features = ["derive", "env"] }
-cli-util = { git = "https://github.com/DenisGorbachev/cli-util" }
 demand = { version = "1.6.4" }
 derive-getters = { version = "0.5.0", features = ["auto_copy_getters"] }
 derive-new = "0.7.0"
 derive_more = { version = "2.1.1", features = ["full"] }
 errgonomic = { git = "https://github.com/DenisGorbachev/errgonomic" }
-fmt-derive = "0.1.2"
 futures = "0.3.31"
-helpful = { git = "https://github.com/DenisGorbachev/helpful" }
 itertools = { version = "0.14.0" }
-standard-traits = { git = "https://github.com/DenisGorbachev/standard-traits" }
 strum = { version = "0.28.0", features = ["derive"] }
-stub-macro = { version = "0.3.0" }
 subtype = { git = "https://github.com/DenisGorbachev/subtype" }
 thiserror = "2.0.17"
 tokio = { version = "1.39.2", features = ["macros", "fs", "net", "rt", "rt-multi-thread"] }

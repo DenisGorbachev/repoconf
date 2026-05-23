@@ -2,7 +2,7 @@ use crate::GitRemoteName;
 use errgonomic::handle;
 use itertools::Itertools;
 use thiserror::Error;
-use xshell::{cmd, Shell};
+use xshell::{Shell, cmd};
 
 pub trait GitRemoteNames {
     fn git_remote_names(&self) -> Result<impl Iterator<Item = GitRemoteName>, GitRemoteNamesError>;

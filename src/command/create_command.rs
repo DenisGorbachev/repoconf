@@ -1,11 +1,11 @@
 use crate::{InitCommand, InitCommandRunError, RepoName, Visibility};
-use clap::{value_parser, Parser};
+use clap::{Parser, value_parser};
 use errgonomic::{handle, handle_bool};
 use std::path::PathBuf;
 use std::process::{ExitCode, Output};
 use thiserror::Error;
 use url::Url;
-use xshell::{cmd, Shell};
+use xshell::{Shell, cmd};
 
 #[derive(Parser, Clone, Debug)]
 pub struct CreateCommand {

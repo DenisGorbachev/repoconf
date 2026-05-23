@@ -1,11 +1,11 @@
-use crate::{git_remote_exists, GitLocalBranchExists, GitLocalBranchExistsError, GitRemoteExistsError, SetExecutableBit, SetExecutableBitError};
-use clap::{value_parser, Parser};
+use crate::{GitLocalBranchExists, GitLocalBranchExistsError, GitRemoteExistsError, SetExecutableBit, SetExecutableBitError, git_remote_exists};
+use clap::{Parser, value_parser};
 use errgonomic::{handle, handle_opt};
 use std::path::PathBuf;
 use std::process::ExitCode;
 use thiserror::Error;
 use url::Url;
-use xshell::{cmd, Shell};
+use xshell::{Shell, cmd};
 
 #[derive(Parser, Clone, Debug)]
 pub struct InitCommand {

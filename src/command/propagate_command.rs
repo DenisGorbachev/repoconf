@@ -1,6 +1,6 @@
 use crate::{BranchNameStrategy, MergeCommand, MergeCommandRunError};
-use clap::{value_parser, Parser};
-use errgonomic::{handle, handle_iter, map_err, ErrVec};
+use clap::{Parser, value_parser};
+use errgonomic::{ErrVec, handle, handle_iter, map_err};
 use futures::stream::{self, TryStreamExt};
 use itertools::Itertools;
 use std::path::PathBuf;

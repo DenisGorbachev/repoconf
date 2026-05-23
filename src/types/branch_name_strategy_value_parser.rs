@@ -1,7 +1,7 @@
 use crate::BranchNameStrategy;
+use BranchNameStrategy::*;
 use clap::builder::TypedValueParser;
 use clap::error::ErrorKind;
-use BranchNameStrategy::*;
 
 #[derive(Clone, Debug)]
 pub struct BranchNameStrategyValueParser;

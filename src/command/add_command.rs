@@ -1,11 +1,11 @@
-use crate::{unwrap_or_current_dir, RepoName, UnwrapOrCurrentDirError};
-use clap::{value_parser, Parser};
+use crate::{RepoName, UnwrapOrCurrentDirError, unwrap_or_current_dir};
+use clap::{Parser, value_parser};
 use errgonomic::handle;
 use std::path::PathBuf;
 use std::process::ExitCode;
 use thiserror::Error;
 use url::Url;
-use xshell::{cmd, Shell};
+use xshell::{Shell, cmd};
 
 #[derive(Parser, Clone, Debug)]
 pub struct AddCommand {

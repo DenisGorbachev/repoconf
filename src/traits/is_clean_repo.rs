@@ -1,6 +1,6 @@
 use errgonomic::handle;
 use thiserror::Error;
-use xshell::{cmd, Shell};
+use xshell::{Shell, cmd};
 
 pub trait IsCleanRepo {
     fn is_clean_repo(&self) -> Result<bool, IsCleanRepoError>;

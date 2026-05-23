@@ -1,7 +1,7 @@
 use crate::{ConvertStrToGitRemoteError, GitRemote};
-use errgonomic::{handle, handle_iter, ErrVec};
+use errgonomic::{ErrVec, handle, handle_iter};
 use thiserror::Error;
-use xshell::{cmd, Shell};
+use xshell::{Shell, cmd};
 
 pub fn git_remote_exists(sh: &Shell, remote_template_url: &str) -> Result<bool, GitRemoteExistsError> {
     use GitRemoteExistsError::*;

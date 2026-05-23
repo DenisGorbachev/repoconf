@@ -1,7 +1,7 @@
+use Subcommand::*;
 use errgonomic::map_err;
 use std::process::ExitCode;
 use thiserror::Error;
-use Subcommand::*;
 
 #[derive(clap::Parser, Debug)]
 #[command(author, version, about, propagate_version = true)]

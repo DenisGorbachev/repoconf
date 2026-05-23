@@ -1,7 +1,7 @@
 use errgonomic::handle;
 use std::io;
 use thiserror::Error;
-use xshell::{cmd, Shell};
+use xshell::{Shell, cmd};
 
 pub trait GitLocalBranchExists {
     fn git_local_branch_exists(&self, branch_name: &str) -> Result<bool, GitLocalBranchExistsError>;

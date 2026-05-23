@@ -3,20 +3,27 @@ min_version = "2026.4.8"
 [settings]
 idiomatic_version_file_enable_tools = ["rust"]
 
+[plugins]
+fnox-env = "https://github.com/jdx/mise-env-fnox"
+
 [tools]
-node = "22.12.0"
+node = "24.15.0"
 deno = "1.46.1"
+fnox = "1.21.0"
 cargo-binstall = "1.10.15"
 "npm:lefthook" = "1.8.5"
 "npm:@commitlint/config-conventional" = "19.6.0"
 "npm:@commitlint/cli" = "19.6.0"
 "npm:@commitlint/types" = "19.5.0"
 "npm:repomix" = "1.5.0"
-"cargo:cargo-insert-docs" = "1.2.0"
+"cargo:cargo-insert-docs" = "1.6.0"
 "cargo:cargo-hack" = "0.6.33"
 "cargo:cargo-nextest" = "0.9.102"
 "cargo:cargo-expand" = "1.0.114"
 "cargo:rumdl" = "0.1.0"
+
+[env]
+_.fnox-env = { tools = true }
 
 [tasks."build"]
 run = "cargo build --workspace"
