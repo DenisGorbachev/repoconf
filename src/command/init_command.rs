@@ -25,6 +25,10 @@ pub struct InitCommand {
     #[arg(long, short)]
     pub skip_post_init: bool,
 
+    /// Additional post-init script to run after the template's post-init script
+    #[arg(long, value_parser = value_parser!(PathBuf))]
+    pub post_init: Option<PathBuf>,
+
     /// Template repo name
     #[arg()]
     pub template_name: String,
@@ -48,6 +52,7 @@ impl InitCommand {
             remote_name,
             branch_name,
             skip_post_init,
+            post_init,
             dir,
         } = self;
 
@@ -93,25 +98,30 @@ impl InitCommand {
 
         if !skip_post_init {
             let post_init_script = sh_dir.current_dir().join(".repoconf/hooks/post-init.sh");
-            if sh_dir.path_exists(&post_init_script) {
-                handle!(
-                    post_init_script.set_executable_bit(),
-                    SetExecutableBitFailed,
-                    path: post_init_script
-                );
-                handle!(
-                    cmd!(sh_dir, "usage bash {post_init_script} --name {repo_name} {dir}").run_interactive(),
-                    PostInitRunFailed,
-                    path: post_init_script,
-                    repo_name,
-                    dir
-                );
-            } else {
-                eprintln!("[WARN] Could not find post-init script at {post_init_script}", post_init_script = post_init_script.display());
+            handle!(Self::run_post_init(&sh_dir, &post_init_script, &repo_name, &dir), RunPostInitFailed);
+            if let Some(post_init) = post_init {
+                handle!(Self::run_post_init(&sh_dir, &post_init, &repo_name, &dir), RunPostInitFailed);
             }
         }
 
         Ok(ExitCode::SUCCESS)
+    }
+
+    fn run_post_init(sh_dir: &Shell, path: &PathBuf, repo_name: &str, dir: &PathBuf) -> Result<(), InitCommandRunPostInitError> {
+        use InitCommandRunPostInitError::*;
+        if sh_dir.path_exists(path) {
+            handle!(path.set_executable_bit(), SetExecutableBitFailed, path: path);
+            handle!(
+                cmd!(sh_dir, "usage bash {path} --name {repo_name} {dir}").run_interactive(),
+                RunInteractiveFailed,
+                path: path,
+                repo_name: repo_name,
+                dir: dir
+            );
+        } else {
+            eprintln!("[WARN] Could not find post-init script at {path}", path = path.display());
+        }
+        Ok(())
     }
 }
 
@@ -139,8 +149,14 @@ pub enum InitCommandRunError {
     GitBranchUnsetUpstreamFailed { source: xshell::Error, branch_name: String },
     #[error("failed to push branch '{branch_name}' to remote '{remote_name}'")]
     GitPushFailed { source: xshell::Error, remote_name: String, branch_name: String },
+    #[error("failed to run a post-init script")]
+    RunPostInitFailed { source: InitCommandRunPostInitError },
+}
+
+#[derive(Error, Debug)]
+pub enum InitCommandRunPostInitError {
     #[error("failed to set executable bit for '{path}'")]
     SetExecutableBitFailed { source: SetExecutableBitError, path: PathBuf },
     #[error("failed to run post-init script '{path}' for '{repo_name}' in '{dir}'")]
-    PostInitRunFailed { source: xshell::Error, path: PathBuf, repo_name: String, dir: PathBuf },
+    RunInteractiveFailed { source: xshell::Error, path: PathBuf, repo_name: String, dir: PathBuf },
 }

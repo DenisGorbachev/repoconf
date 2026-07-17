@@ -17,6 +17,10 @@ pub struct CreateCommand {
     #[arg(long, short)]
     skip_post_init: bool,
 
+    /// Additional post-init script to run after the template's post-init script
+    #[arg(long, value_parser = value_parser!(PathBuf))]
+    post_init: Option<PathBuf>,
+
     /// Repo visibility
     #[arg(value_enum, long, short)]
     visibility: Visibility,
@@ -58,6 +62,7 @@ impl CreateCommand {
             remote_name,
             branch_name,
             skip_post_init,
+            post_init,
             dir,
         } = self;
 
@@ -121,6 +126,7 @@ impl CreateCommand {
             remote_name,
             branch_name,
             skip_post_init,
+            post_init,
             template_name,
             template_url,
             dir,
