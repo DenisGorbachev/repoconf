@@ -28,6 +28,10 @@ pub struct MergeCommand {
     #[arg(long)]
     pub no_remote_update: bool,
 
+    /// Do not run the post-merge hook after merging
+    #[arg(long)]
+    pub skip_post_merge: bool,
+
     /// Name of the local branch to merge onto
     ///
     /// If you pass "-", the command will determine the branch automatically: use "main" if exists, use "master" if exists.
@@ -56,6 +60,7 @@ impl MergeCommand {
             allow_unrelated_histories,
             no_push,
             no_remote_update,
+            skip_post_merge,
             local_branch_strategy,
             remote_branch_strategy,
         } = self;
@@ -104,6 +109,11 @@ impl MergeCommand {
 
         handle!(Self::merge_remotes(&sh_dir, remotes, &remote_branch_strategy, &refs, allow_unrelated_histories), MergeRemotesFailed);
 
+        if !skip_post_merge {
+            let post_merge_path = sh_dir.current_dir().join(".repoconf/hooks/post-merge.sh");
+            handle!(Self::run_post_merge(&sh_dir, post_merge_path), RunPostMergeFailed);
+        }
+
         if !no_push {
             handle!(cmd!(sh_dir, "git push").run_echo(), GitPushFailed);
         }
@@ -145,6 +155,14 @@ impl MergeCommand {
 
         Ok(())
     }
+
+    fn run_post_merge(sh_dir: &Shell, path: PathBuf) -> Result<(), MergeCommandRunPostMergeError> {
+        use MergeCommandRunPostMergeError::*;
+        if sh_dir.path_exists(&path) {
+            handle!(cmd!(sh_dir, "bash {path}").run_interactive(), RunInteractiveFailed, path);
+        }
+        Ok(())
+    }
 }
 
 #[derive(Error, Debug)]
@@ -173,6 +191,8 @@ pub enum MergeCommandRunError {
     GitRemoteUpdateFailed { source: xshell::Error, remotes: Vec<String> },
     #[error("failed to merge remotes")]
     MergeRemotesFailed { source: MergeCommandMergeRemotesError },
+    #[error("failed to run the post-merge hook")]
+    RunPostMergeFailed { source: MergeCommandRunPostMergeError },
     #[error("failed to push merged changes")]
     GitPushFailed { source: xshell::Error },
 }
@@ -189,4 +209,10 @@ pub enum MergeCommandMergeRemoteError {
     RemoteBranchNameResolveFailed { source: BranchNameStrategyToBranchNameError, prefix: String, remote: String },
     #[error("failed to merge from '{remote}/{remote_branch_name}'")]
     GitMergeFailed { source: xshell::Error, remote: String, remote_branch_name: String },
+}
+
+#[derive(Error, Debug)]
+pub enum MergeCommandRunPostMergeError {
+    #[error("failed to run the post-merge hook '{path}'")]
+    RunInteractiveFailed { source: xshell::Error, path: PathBuf },
 }
