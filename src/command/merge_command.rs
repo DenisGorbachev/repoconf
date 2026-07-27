@@ -1,11 +1,11 @@
-use crate::{BranchNameStrategy, BranchNameStrategyToBranchNameError, GitLocalBranchExists, GitLocalBranchExistsError, GitRefsError, GitRemoteNames, GitRemoteNamesError, IsCleanRepo, IsCleanRepoError, UnwrapOrCurrentDirError, git_refs, unwrap_or_current_dir};
-use clap::{Parser, value_parser};
+use crate::{git_refs, unwrap_or_current_dir, BranchNameStrategy, BranchNameStrategyToBranchNameError, GitLocalBranchExists, GitLocalBranchExistsError, GitRefsError, GitRemoteNames, GitRemoteNamesError, IsCleanRepo, IsCleanRepoError, UnwrapOrCurrentDirError};
+use clap::{value_parser, Parser};
 use errgonomic::{handle, handle_bool};
 use itertools::Itertools;
 use std::path::PathBuf;
 use std::process::ExitCode;
 use thiserror::Error;
-use xshell::{Shell, cmd};
+use xshell::{cmd, Shell};
 
 #[derive(Parser, Default, Clone, Debug)]
 pub struct MergeCommand {
@@ -145,13 +145,21 @@ impl MergeCommand {
             remote
         );
 
+        // Use `git merge --no-commit` + `git commit --no-edit` to trigger a pre-commit hook
+        // Note that pre-merge-commit hook can't add files to the current git index, which means it can't update generated files (e.g. AGENTS.md or README.md)
+
         let flags = if allow_unrelated_histories {
             vec!["--allow-unrelated-histories", "--no-commit"]
         } else {
-            Vec::new()
+            vec!["--no-commit"]
         };
 
         handle!(cmd!(sh_dir, "git merge {remote}/{remote_branch_name} {flags...}").run_echo(), GitMergeFailed, remote, remote_branch_name);
+
+        let merge_head_path = handle!(cmd!(sh_dir, "git rev-parse --path-format=absolute --git-path MERGE_HEAD").read(), GitMergeHeadPathFailed, remote, remote_branch_name);
+        if sh_dir.path_exists(merge_head_path) {
+            handle!(cmd!(sh_dir, "git commit --no-edit").run_echo(), GitCommitFailed, remote, remote_branch_name);
+        }
 
         Ok(())
     }
@@ -209,6 +217,10 @@ pub enum MergeCommandMergeRemoteError {
     RemoteBranchNameResolveFailed { source: BranchNameStrategyToBranchNameError, prefix: String, remote: String },
     #[error("failed to merge from '{remote}/{remote_branch_name}'")]
     GitMergeFailed { source: xshell::Error, remote: String, remote_branch_name: String },
+    #[error("failed to resolve the merge state path after merging from '{remote}/{remote_branch_name}'")]
+    GitMergeHeadPathFailed { source: xshell::Error, remote: String, remote_branch_name: String },
+    #[error("failed to commit the merge from '{remote}/{remote_branch_name}'")]
+    GitCommitFailed { source: xshell::Error, remote: String, remote_branch_name: String },
 }
 
 #[derive(Error, Debug)]
