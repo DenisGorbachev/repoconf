@@ -2,6 +2,7 @@ use crate::BranchNameStrategy;
 use BranchNameStrategy::*;
 use clap::builder::TypedValueParser;
 use clap::error::ErrorKind;
+use std::ffi::OsStr;
 
 #[derive(Clone, Debug)]
 pub struct BranchNameStrategyValueParser;
@@ -9,7 +10,7 @@ pub struct BranchNameStrategyValueParser;
 impl TypedValueParser for BranchNameStrategyValueParser {
     type Value = BranchNameStrategy;
 
-    fn parse_ref(&self, _cmd: &clap::Command, _arg: Option<&clap::Arg>, value: &std::ffi::OsStr) -> Result<Self::Value, clap::Error> {
+    fn parse_ref(&self, _cmd: &clap::Command, _arg: Option<&clap::Arg>, value: &OsStr) -> Result<Self::Value, clap::Error> {
         let val = match value.to_str() {
             Some(val) => val,
             None => {

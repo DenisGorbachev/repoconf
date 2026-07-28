@@ -1,40 +1,67 @@
-[package]
-name = "repoconf"
+[workspace]
+resolver = "3"
+
+[workspace.package]
 version = "0.1.0"
 edition = "2024"
 rust-version = "1.93.1"
 license = "Apache-2.0 OR MIT"
-description = "A utility CLI for managing configs across repos"
 homepage = "https://github.com/DenisGorbachev/repoconf"
 repository = "https://github.com/DenisGorbachev/repoconf"
-readme = "README.md"
 keywords = []
 categories = []
 exclude = [
-    ".*",
-    "*.local.*",
-    "doc/dev",
-    "specs",
-    "AGENTS.ts",
-    "README.ts",
-    "AGENTS*.md",
-    "CLAUDE*.md",
-    "deno.lock",
-    "deno.json",
-    "commitlint.config.mjs",
-    "fnox.toml",
-    "lefthook.yml",
-    "mise.toml",
-    "rumdl.toml",
-    "rustfmt.toml",
-    ".yolobox"
+  ".*",
+  "*.local.*",
+  "doc/dev",
+  "specs",
+  "AGENTS.ts",
+  "README.ts",
+  "AGENTS*.md",
+  "CLAUDE*.md",
+  "deno.lock",
+  "deno.json",
+  "commitlint.config.mjs",
+  "fnox.toml",
+  "mise.toml",
+  "rumdl.toml",
+  "rustfmt.toml",
+  ".yolobox",
 ]
 
-[package.metadata.details]
-tagline = ""
-summary = ""
-announcement = ""
+[workspace.metadata.details]
+name = "repoconf"
+title = "Repoconf"
 readme = { generate = false }
+
+[workspace.lints.rust]
+redundant_imports = "deny"
+unused_import_braces = "deny"
+# unused_qualifications must not be "deny" because our code style has multiple `use Foo::*;`, and some macros (derive_more::Display, strum::Display, strum::EnumString) produce code with full qualifications
+# unused_qualifications = "deny"
+
+[workspace.lints.clippy]
+absolute_paths = "deny"
+arithmetic_side_effects = "deny"
+
+[package]
+name = "repoconf"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "A utility CLI for managing configs across repos."
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
+exclude.workspace = true
+
+[package.metadata.details]
+title = "Repoconf"
+
+[lints]
+workspace = true
 
 [dependencies]
 clap = { version = "4.5.11", features = ["derive", "env"] }
@@ -48,7 +75,13 @@ itertools = { version = "0.14.0" }
 strum = { version = "0.28.0", features = ["derive"] }
 subtype = { git = "https://github.com/DenisGorbachev/subtype" }
 thiserror = "2.0.17"
-tokio = { version = "1.39.2", features = ["macros", "fs", "net", "rt", "rt-multi-thread"] }
+tokio = { version = "1.39.2", features = [
+  "macros",
+  "fs",
+  "net",
+  "rt",
+  "rt-multi-thread",
+] }
 url = "2.5.4"
 walkdir = { version = "2.5.0" }
 xshell = { version = "0.3.0-pre.2" }

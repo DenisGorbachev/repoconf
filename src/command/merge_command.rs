@@ -1,11 +1,11 @@
-use crate::{git_refs, unwrap_or_current_dir, BranchNameStrategy, BranchNameStrategyToBranchNameError, GitLocalBranchExists, GitLocalBranchExistsError, GitRefsError, GitRemoteNames, GitRemoteNamesError, IsCleanRepo, IsCleanRepoError, UnwrapOrCurrentDirError};
-use clap::{value_parser, Parser};
+use crate::{BranchNameStrategy, BranchNameStrategyToBranchNameError, GitLocalBranchExists, GitLocalBranchExistsError, GitRefsError, GitRemoteNames, GitRemoteNamesError, IsCleanRepo, IsCleanRepoError, UnwrapOrCurrentDirError, git_refs, unwrap_or_current_dir};
+use clap::{Parser, value_parser};
 use errgonomic::{handle, handle_bool};
 use itertools::Itertools;
 use std::path::PathBuf;
 use std::process::ExitCode;
 use thiserror::Error;
-use xshell::{cmd, Shell};
+use xshell::{Shell, cmd};
 
 #[derive(Parser, Default, Clone, Debug)]
 pub struct MergeCommand {

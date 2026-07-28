@@ -1,5 +1,6 @@
 use clap::{Parser, value_parser};
 use errgonomic::handle;
+use std::io;
 use std::path::PathBuf;
 use std::process::ExitCode;
 use thiserror::Error;
@@ -26,5 +27,5 @@ impl PrintCommand {
 #[derive(Error, Debug)]
 pub enum PrintCommandRunError {
     #[error("failed to read file at '{path}'")]
-    ReadToStringFailed { source: std::io::Error, path: PathBuf },
+    ReadToStringFailed { source: io::Error, path: PathBuf },
 }

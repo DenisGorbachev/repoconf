@@ -1,6 +1,7 @@
 use crate::{InitCommand, InitCommandRunError, RepoName, Visibility};
 use clap::{Parser, value_parser};
 use errgonomic::{handle, handle_bool};
+use std::io;
 use std::path::PathBuf;
 use std::process::{ExitCode, Output};
 use thiserror::Error;
@@ -142,7 +143,7 @@ pub enum CreateCommandRunError {
     #[error("failed to create a shell instance")]
     ShellNewFailed { source: xshell::Error },
     #[error("failed to view repository '{repo_name_full}'")]
-    RepoViewOutputFailed { source: std::io::Error, repo_name_full: String },
+    RepoViewOutputFailed { source: io::Error, repo_name_full: String },
     #[error("repository '{repo_name_full}' already exists")]
     RepositoryAlreadyExists { repo_name_full: String },
     #[error("unexpected output while viewing repository '{repo_name_full}'")]
@@ -150,7 +151,7 @@ pub enum CreateCommandRunError {
     #[error("failed to create repository '{repo_name_full}' with visibility '{visibility_arg}'")]
     RepoCreateFailed { source: xshell::Error, repo_name_full: String, visibility_arg: String },
     #[error("failed to check whether directory '{dir}' exists")]
-    DirExistsCheckFailed { source: std::io::Error, dir: PathBuf },
+    DirExistsCheckFailed { source: io::Error, dir: PathBuf },
     #[error("failed to read repository name for directory '{dir}'")]
     RepoNameWithOwnerReadFailed { source: xshell::Error, dir: PathBuf },
     #[error("directory '{dir}' already exists and belongs to '{repo_name_full_current}'")]
