@@ -2,7 +2,8 @@ use crate::{BranchNameStrategy, BranchNameStrategyToBranchNameError, GitLocalBra
 use clap::{Parser, value_parser};
 use errgonomic::{handle, handle_bool};
 use itertools::Itertools;
-use std::path::PathBuf;
+use serde_json::Value;
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use thiserror::Error;
 use xshell::{Shell, cmd};
@@ -12,6 +13,13 @@ pub struct MergeCommand {
     /// Child repository directory (defaults to current directory)
     #[arg(long, short, value_parser = value_parser!(PathBuf))]
     pub dir: Option<PathBuf>,
+
+    /// Continue an in-progress merge after resolving and staging all conflicts
+    #[arg(
+        long = "continue",
+        conflicts_with_all = ["allow_dirty", "allow_unrelated_histories", "no_remote_update", "local_branch_strategy", "remote_branch_strategy"]
+    )]
+    pub continue_merge: bool,
 
     /// Run the command even if the repository has uncommitted changes
     #[arg(long)]
@@ -56,6 +64,7 @@ impl MergeCommand {
         use MergeCommandRunError::*;
         let Self {
             dir,
+            continue_merge,
             allow_dirty,
             allow_unrelated_histories,
             no_push,
@@ -68,46 +77,50 @@ impl MergeCommand {
         let dir = handle!(unwrap_or_current_dir(dir), UnwrapOrCurrentDirFailed);
         let sh_dir = handle!(Shell::new(), ShellNewFailed).with_current_dir(&dir);
 
-        let remotes = handle!(sh_dir.git_remote_names(), GitRemoteNamesFailed)
-            .filter(|name| name.starts_with("repoconf"))
-            .collect_vec();
+        if continue_merge {
+            handle!(Self::continue_merge(&sh_dir), ContinueMergeFailed);
+        } else {
+            let remotes = handle!(sh_dir.git_remote_names(), GitRemoteNamesFailed)
+                .filter(|name| name.starts_with("repoconf"))
+                .collect_vec();
 
-        // NOTE: [`PropagateCommand`] relies on this behavior
-        if remotes.is_empty() {
-            return Ok(ExitCode::SUCCESS);
+            // NOTE: [`PropagateCommand`] relies on this behavior
+            if remotes.is_empty() {
+                return Ok(ExitCode::SUCCESS);
+            }
+
+            let is_clean = handle!(sh_dir.is_clean_repo(), IsCleanRepoFailed);
+            handle_bool!(!allow_dirty && !is_clean, RepositoryNotClean, dir);
+
+            let refs = handle!(git_refs(&sh_dir), GitRefsFailed);
+
+            let local_branch_name = handle!(
+                local_branch_strategy.to_branch_name("refs/heads", &refs),
+                LocalBranchNameResolveFailed,
+                prefix: "refs/heads",
+                strategy: local_branch_strategy
+            );
+
+            let local_branch_exists = handle!(
+                sh_dir.git_local_branch_exists(&local_branch_name),
+                GitLocalBranchExistsFailed,
+                branch_name: local_branch_name
+            );
+            handle_bool!(!local_branch_exists, LocalBranchDoesNotExist, branch_name: local_branch_name);
+
+            handle!(
+                cmd!(sh_dir, "git checkout {local_branch_name}").run_echo(),
+                GitCheckoutFailed,
+                branch_name: local_branch_name
+            );
+
+            let remotes_slice = remotes.as_slice();
+            if !no_remote_update {
+                handle!(cmd!(sh_dir, "git remote update {remotes_slice...}").run_echo(), GitRemoteUpdateFailed, remotes);
+            }
+
+            handle!(Self::merge_remotes(&sh_dir, remotes, &remote_branch_strategy, &refs, allow_unrelated_histories), MergeRemotesFailed);
         }
-
-        let is_clean = handle!(sh_dir.is_clean_repo(), IsCleanRepoFailed);
-        handle_bool!(!allow_dirty && !is_clean, RepositoryNotClean, dir);
-
-        let refs = handle!(git_refs(&sh_dir), GitRefsFailed);
-
-        let local_branch_name = handle!(
-            local_branch_strategy.to_branch_name("refs/heads", &refs),
-            LocalBranchNameResolveFailed,
-            prefix: "refs/heads",
-            strategy: local_branch_strategy
-        );
-
-        let local_branch_exists = handle!(
-            sh_dir.git_local_branch_exists(&local_branch_name),
-            GitLocalBranchExistsFailed,
-            branch_name: local_branch_name
-        );
-        handle_bool!(!local_branch_exists, LocalBranchDoesNotExist, branch_name: local_branch_name);
-
-        handle!(
-            cmd!(sh_dir, "git checkout {local_branch_name}").run_echo(),
-            GitCheckoutFailed,
-            branch_name: local_branch_name
-        );
-
-        let remotes_slice = remotes.as_slice();
-        if !no_remote_update {
-            handle!(cmd!(sh_dir, "git remote update {remotes_slice...}").run_echo(), GitRemoteUpdateFailed, remotes);
-        }
-
-        handle!(Self::merge_remotes(&sh_dir, remotes, &remote_branch_strategy, &refs, allow_unrelated_histories), MergeRemotesFailed);
 
         if !skip_post_merge {
             let post_merge_path = sh_dir.current_dir().join(".repoconf/hooks/post-merge.sh");
@@ -119,6 +132,37 @@ impl MergeCommand {
         }
 
         Ok(ExitCode::SUCCESS)
+    }
+
+    fn continue_merge(sh_dir: &Shell) -> Result<(), MergeCommandContinueMergeError> {
+        use MergeCommandContinueMergeError::*;
+        let merge_head_path = handle!(cmd!(sh_dir, "git rev-parse --path-format=absolute --git-path MERGE_HEAD").read(), GitMergeHeadPathFailed);
+        handle_bool!(!sh_dir.path_exists(merge_head_path), MergeNotInProgress);
+        let unmerged_paths = handle!(cmd!(sh_dir, "git diff --name-only --diff-filter=U").read(), UnmergedPathsReadFailed);
+        handle_bool!(!unmerged_paths.is_empty(), UnresolvedConflicts, paths: unmerged_paths);
+        handle!(Self::install_mise_if_repository_configured(sh_dir), InstallMiseIfRepositoryConfiguredFailed);
+        handle!(cmd!(sh_dir, "git commit --no-edit").run_echo(), GitCommitFailed);
+        Ok(())
+    }
+
+    fn install_mise_if_repository_configured(sh_dir: &Shell) -> Result<(), MergeCommandInstallMiseIfRepositoryConfiguredError> {
+        use MergeCommandInstallMiseIfRepositoryConfiguredError::*;
+        let repository_root = PathBuf::from(handle!(cmd!(sh_dir, "git rev-parse --path-format=absolute --show-toplevel").read(), GitRepositoryRootReadFailed));
+        let mise_configs_json = handle!(cmd!(sh_dir, "mise --no-hooks config ls --json").read(), MiseConfigListFailed);
+        let mise_configs = handle!(serde_json::from_str::<Vec<Value>>(&mise_configs_json), FromStrFailed, json: mise_configs_json);
+        handle_bool!(
+            mise_configs.iter().any(|config| config.get("path").and_then(Value::as_str).is_none()),
+            MiseConfigListInvalid,
+            configs: mise_configs
+        );
+        let has_repository_mise_config = mise_configs
+            .iter()
+            .filter_map(|config| config.get("path").and_then(Value::as_str))
+            .any(|path| Path::new(path).starts_with(&repository_root));
+        if has_repository_mise_config {
+            handle!(cmd!(sh_dir, "mise install").run_interactive(), MiseInstallFailed);
+        }
+        Ok(())
     }
 
     fn merge_remotes(sh_dir: &Shell, remotes: Vec<String>, remote_branch_strategy: &BranchNameStrategy, refs: &[String], allow_unrelated_histories: bool) -> Result<(), MergeCommandMergeRemotesError> {
@@ -179,6 +223,8 @@ pub enum MergeCommandRunError {
     UnwrapOrCurrentDirFailed { source: UnwrapOrCurrentDirError },
     #[error("failed to create a shell instance")]
     ShellNewFailed { source: xshell::Error },
+    #[error("failed to continue the merge")]
+    ContinueMergeFailed { source: MergeCommandContinueMergeError },
     #[error("failed to read git remote names")]
     GitRemoteNamesFailed { source: GitRemoteNamesError },
     #[error("failed to check repository status")]
@@ -203,6 +249,36 @@ pub enum MergeCommandRunError {
     RunPostMergeFailed { source: MergeCommandRunPostMergeError },
     #[error("failed to push merged changes")]
     GitPushFailed { source: xshell::Error },
+}
+
+#[derive(Error, Debug)]
+pub enum MergeCommandContinueMergeError {
+    #[error("failed to resolve the merge state path")]
+    GitMergeHeadPathFailed { source: xshell::Error },
+    #[error("no merge is in progress")]
+    MergeNotInProgress,
+    #[error("failed to read unresolved merge paths")]
+    UnmergedPathsReadFailed { source: xshell::Error },
+    #[error("merge conflicts remain:\n{paths}")]
+    UnresolvedConflicts { paths: String },
+    #[error("failed to install mise if the repository is configured")]
+    InstallMiseIfRepositoryConfiguredFailed { source: MergeCommandInstallMiseIfRepositoryConfiguredError },
+    #[error("failed to commit the resolved merge")]
+    GitCommitFailed { source: xshell::Error },
+}
+
+#[derive(Error, Debug)]
+pub enum MergeCommandInstallMiseIfRepositoryConfiguredError {
+    #[error("failed to resolve the repository root")]
+    GitRepositoryRootReadFailed { source: xshell::Error },
+    #[error("failed to list mise config files")]
+    MiseConfigListFailed { source: xshell::Error },
+    #[error("failed to deserialize the mise config file list")]
+    FromStrFailed { source: serde_json::Error, json: String },
+    #[error("mise returned a config file entry without a string path")]
+    MiseConfigListInvalid { configs: Vec<Value> },
+    #[error("failed to install mise tools and hooks before committing the merge")]
+    MiseInstallFailed { source: xshell::Error },
 }
 
 #[derive(Error, Debug)]
