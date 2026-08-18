@@ -74,7 +74,7 @@ impl CreateCommand {
         let visibility_arg = visibility.as_arg();
 
         let repo_view_cmd = cmd!(&sh_cwd, "gh repo view --json name {repo_name_full}");
-        eprintln!("$ {}", &repo_view_cmd);
+        eprintln!("$ {repo_view_cmd}");
         let mut repo_view_command = repo_view_cmd.to_command();
         let repo_view_output = handle!(repo_view_command.output(), RepoViewOutputFailed, repo_name_full);
         match repo_view_output.status.code() {
