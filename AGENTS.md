@@ -1156,7 +1156,7 @@ mod tests {
         let mut actual = String::new();
         let displayer = ErrorDisplayer(error);
         writeln!(actual, "{displayer}").unwrap();
-        eprintln!("{}", actual);
+        eprintln!("{}", &actual);
         assert_eq!(actual, expected)
     }
 
@@ -1696,21 +1696,6 @@ macro_rules! map_err {
     };
 }
 
-/// Converts [`None`] into an error variant without returning early.
-///
-/// [`map_none`](crate::map_none) should be used only when the error variant doesn't capture any owned variables (which is very rare), or exactly at the end of the block (in the position of returned expression).
-#[macro_export]
-macro_rules! map_none {
-    ($option:expr, $variant:ident$(,)? $($arg:ident$(: $value:expr)?),*) => {
-        match $option {
-            Some(value) => Ok(value),
-            None => Err($variant {
-                $($arg: $crate::_into!($arg$(: $value)?)),*
-            })
-        }
-    };
-}
-
 /// Internal
 #[doc(hidden)]
 #[macro_export]
@@ -1743,6 +1728,7 @@ macro_rules! _index_err_async {
 
 #[cfg(all(test, feature = "std"))]
 mod tests {
+
     use crate::{ErrVec, ItemError, PathBufDisplay};
     use futures::future::join_all;
     use serde::{Deserialize, Serialize};
@@ -1793,12 +1779,12 @@ mod tests {
         }
     }
 
-    /// This function tests the [`crate::handle_opt!`] and [`crate::map_none!`] macros.
+    /// This function tests the [`crate::handle_opt!`] macro
     #[allow(dead_code)]
-    fn first_word(lines: &[String]) -> Result<&str, FirstWordError> {
-        use FirstWordError::*;
-        let line = handle_opt!(lines.first(), LineNotFound);
-        map_none!(line.split_whitespace().next(), WordNotFound)
+    fn find_even(numbers: Vec<u32>) -> Result<u32, FindEvenError> {
+        use FindEvenError::*;
+        let even = handle_opt!(numbers.iter().find(|x| *x % 2 == 0), NotFound);
+        Ok(*even)
     }
 
     /// This function tests the [`crate::handle_iter!`] macro
@@ -1903,11 +1889,9 @@ mod tests {
     }
 
     #[derive(Error, Debug)]
-    enum FirstWordError {
-        #[error("line not found")]
-        LineNotFound {},
-        #[error("word not found")]
-        WordNotFound {},
+    enum FindEvenError {
+        #[error("even number not found")]
+        NotFound,
     }
 
     #[derive(Error, Debug)]
@@ -2275,8 +2259,8 @@ run = [{ task = "test:code", args = ["--cargo-quiet", "--hide-progress-bar", "--
 if_missing = "error"
 
 [providers]
-keychain = { type = "keychain", service = "rust-private-lib-template" }
-pass = { type = "password-store", prefix = "rust-private-lib-template/" }
+keychain = { type = "keychain", service = "repoconf" }
+pass = { type = "password-store", prefix = "repoconf/" }
 ```
 
 #### Cargo.toml
@@ -2370,18 +2354,6 @@ tokio = { version = "1.39.2", features = [
 url = "2.5.4"
 walkdir = { version = "2.5.0" }
 xshell = { version = "0.3.0-pre.2" }
-```
-
-#### fnox.toml
-
-```toml
-#:schema https://fnox.jdx.dev/schema.json
-
-if_missing = "error"
-
-[providers]
-keychain = { type = "keychain", service = "repoconf" }
-pass = { type = "password-store", prefix = "repoconf/" }
 ```
 
 #### src/lib.rs

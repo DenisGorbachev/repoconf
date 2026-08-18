@@ -17,13 +17,17 @@ pub struct MergeCommand {
     /// Continue an in-progress merge after resolving and staging all conflicts
     #[arg(
         long = "continue",
-        conflicts_with_all = ["allow_dirty", "allow_unrelated_histories", "no_remote_update", "local_branch_strategy", "remote_branch_strategy"]
+        conflicts_with_all = ["allow_dirty", "skip_dirty", "allow_unrelated_histories", "no_remote_update", "local_branch_strategy", "remote_branch_strategy"]
     )]
     pub continue_merge: bool,
 
     /// Run the command even if the repository has uncommitted changes
     #[arg(long)]
     pub allow_dirty: bool,
+
+    /// Exit successfully without modifying the repository if it has uncommitted changes
+    #[arg(long, conflicts_with = "allow_dirty")]
+    pub skip_dirty: bool,
 
     #[arg(long)]
     pub allow_unrelated_histories: bool,
@@ -66,6 +70,7 @@ impl MergeCommand {
             dir,
             continue_merge,
             allow_dirty,
+            skip_dirty,
             allow_unrelated_histories,
             no_push,
             no_remote_update,
@@ -90,6 +95,10 @@ impl MergeCommand {
             }
 
             let is_clean = handle!(sh_dir.is_clean_repo(), IsCleanRepoFailed);
+            if skip_dirty && !is_clean {
+                eprintln!("[SKIP] repository '{}' has uncommitted changes", dir.display());
+                return Ok(ExitCode::SUCCESS);
+            }
             handle_bool!(!allow_dirty && !is_clean, RepositoryNotClean, dir);
 
             let refs = handle!(git_refs(&sh_dir), GitRefsFailed);
