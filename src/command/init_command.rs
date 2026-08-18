@@ -1,6 +1,6 @@
 use crate::{GitLocalBranchExists, GitLocalBranchExistsError, GitRemoteExistsError, SetExecutableBit, SetExecutableBitError, git_remote_exists};
 use clap::{Parser, value_parser};
-use errgonomic::{handle, handle_opt};
+use errgonomic::handle;
 use std::path::PathBuf;
 use std::process::ExitCode;
 use thiserror::Error;
@@ -9,10 +9,6 @@ use xshell::{Shell, cmd};
 
 #[derive(Parser, Clone, Debug)]
 pub struct InitCommand {
-    /// Name of the project (inferred from `dir` by default)
-    #[arg(long, short = 'n')]
-    pub repo_name: Option<String>,
-
     /// Name of the origin remote
     #[arg(long, short, default_value = "origin")]
     pub remote_name: String,
@@ -46,7 +42,6 @@ impl InitCommand {
     pub async fn run(self) -> Result<ExitCode, InitCommandRunError> {
         use InitCommandRunError::*;
         let Self {
-            repo_name,
             template_name,
             template_url,
             remote_name,
@@ -58,14 +53,6 @@ impl InitCommand {
 
         let sh_cwd = handle!(Shell::new(), ShellNewFailed);
 
-        let repo_name = match repo_name {
-            Some(repo_name) => repo_name,
-            None => {
-                let file_stem = handle_opt!(dir.file_stem(), RepoNameNotFound, dir);
-                let file_stem = handle_opt!(file_stem.to_str(), RepoNameNotUtf8, dir);
-                file_stem.to_string()
-            }
-        };
         let remote_template_name = format!("repoconf-{template_name}");
         let remote_template_url = template_url.as_str();
 
@@ -98,24 +85,23 @@ impl InitCommand {
 
         if !skip_post_init {
             let post_init_script = sh_dir.current_dir().join(".repoconf/hooks/post-init.sh");
-            handle!(Self::run_post_init(&sh_dir, &post_init_script, &repo_name, &dir), RunPostInitFailed);
+            handle!(Self::run_post_init(&sh_dir, &post_init_script, &dir), RunPostInitFailed);
             if let Some(post_init) = post_init {
-                handle!(Self::run_post_init(&sh_dir, &post_init, &repo_name, &dir), RunPostInitFailed);
+                handle!(Self::run_post_init(&sh_dir, &post_init, &dir), RunPostInitFailed);
             }
         }
 
         Ok(ExitCode::SUCCESS)
     }
 
-    fn run_post_init(sh_dir: &Shell, path: &PathBuf, repo_name: &str, dir: &PathBuf) -> Result<(), InitCommandRunPostInitError> {
+    fn run_post_init(sh_dir: &Shell, path: &PathBuf, dir: &PathBuf) -> Result<(), InitCommandRunPostInitError> {
         use InitCommandRunPostInitError::*;
         if sh_dir.path_exists(path) {
             handle!(path.set_executable_bit(), SetExecutableBitFailed, path: path);
             handle!(
-                cmd!(sh_dir, "usage bash {path} --name {repo_name} {dir}").run_interactive(),
+                cmd!(sh_dir, "usage bash {path} {dir}").run_interactive(),
                 RunInteractiveFailed,
                 path: path,
-                repo_name: repo_name,
                 dir: dir
             );
         } else {
@@ -129,10 +115,6 @@ impl InitCommand {
 pub enum InitCommandRunError {
     #[error("failed to create a shell instance")]
     ShellNewFailed { source: xshell::Error },
-    #[error("failed to infer repository name from '{dir}'")]
-    RepoNameNotFound { dir: PathBuf },
-    #[error("failed to parse repository name from '{dir}'")]
-    RepoNameNotUtf8 { dir: PathBuf },
     #[error("failed to check whether template remote '{remote_template_url}' exists")]
     GitRemoteExistsFailed { source: GitRemoteExistsError, remote_template_url: String },
     #[error("failed to add git remote '{remote_template_name}' with url '{remote_template_url}'")]
@@ -157,6 +139,6 @@ pub enum InitCommandRunError {
 pub enum InitCommandRunPostInitError {
     #[error("failed to set executable bit for '{path}'")]
     SetExecutableBitFailed { source: SetExecutableBitError, path: PathBuf },
-    #[error("failed to run post-init script '{path}' for '{repo_name}' in '{dir}'")]
-    RunInteractiveFailed { source: xshell::Error, path: PathBuf, repo_name: String, dir: PathBuf },
+    #[error("failed to run post-init script '{path}' in '{dir}'")]
+    RunInteractiveFailed { source: xshell::Error, path: PathBuf, dir: PathBuf },
 }

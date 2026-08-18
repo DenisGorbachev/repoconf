@@ -123,7 +123,6 @@ impl CreateCommand {
         handle!(cmd!(sh_dir, "gh repo set-default {repo_name_full}").run_echo(), RepoSetDefaultFailed, repo_name_full);
 
         let init_cmd = InitCommand {
-            repo_name: Some(repo_name),
             remote_name,
             branch_name,
             skip_post_init,
