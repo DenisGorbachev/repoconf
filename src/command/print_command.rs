@@ -1,4 +1,4 @@
-use clap::{Parser, value_parser};
+use clap::Parser;
 use errgonomic::handle;
 use std::io;
 use std::path::PathBuf;
@@ -8,7 +8,7 @@ use tokio::fs::read_to_string;
 
 #[derive(Parser, Clone, Debug)]
 pub struct PrintCommand {
-    #[arg(short, long, value_parser = value_parser!(PathBuf))]
+    #[arg(short, long)]
     path: PathBuf,
 }
 

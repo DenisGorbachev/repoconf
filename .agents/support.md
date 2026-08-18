@@ -79,13 +79,13 @@
 
 ## .mise/tasks/fix/fnox.sh
 
-- Must depend on `fix:name`.
+- Must `wait_for=["fix:name"]`
 - Must validate that `providers.keychain.service` and `providers.pass.prefix` equal `git:repo-name` and `git:repo-name/`, respectively.
 - Must not migrate secrets between old and new identifiers.
 
 ## .mise/tasks/fix/cargo.sh
 
-- Must depend on `fix:name`.
+- Must `wait_for=["fix:name"]`
 - Must discover workspace package manifests with `cargo metadata`.
 - If a manifest has no `lints` key
   - Then: Must add `lints.workspace = true`.
@@ -104,22 +104,19 @@
 
 ## .mise/tasks/git/install-hooks.sh
 
-- Must install executable `pre-commit`, `pre-merge-commit`, `post-commit`, and `commit-msg` hooks in Git's resolved hooks directory.
+- Must install executable `pre-commit`, `pre-merge-commit`, and `commit-msg` hooks in Git's resolved hooks directory.
 - Hooks must delegate to matching mise tasks and forward all arguments.
 - Installation must replace obsolete Lefthook launchers.
+- Installation must remove the obsolete repository-generated `post-commit` hook without removing a user-modified hook.
 
-## .mise/tasks/git/stage-fixed.sh
+## .mise/tasks/git/validate-commit.sh
 
-- Must restage added, copied, modified, and renamed paths already present in the active index without staging unrelated paths.
-- Must use NUL-delimited literal paths.
-
-## .mise/tasks/git/repair-index.sh
-
-- Must unset `GIT_INDEX_FILE` and repair real-index paths left stale by temporary-index commits.
-- If a staged path's worktree content equals `HEAD`
-  - Then: Must update it.
-  - Else: Must preserve the worktree change.
-- Must use NUL-delimited literal paths and propagate unexpected Git errors.
+- Must reject active-index entries marked `assume-unchanged` or `skip-worktree`.
+- Before checks and after successful checks, must:
+  - Require tracked working-tree contents, including submodules, to match the active index.
+  - Require every nonignored untracked file to be staged or removed.
+- Must run the `check` task against the working tree.
+- Must fail if the active-index tree changes during successful checks.
 
 ## .repoconf/hooks/post-init.sh
 
