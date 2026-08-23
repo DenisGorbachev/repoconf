@@ -2090,13 +2090,10 @@ min_version = "2026.7.13"
 idiomatic_version_file_enable_tools = ["rust"]
 task.output = "keep-order"
 
-[plugins]
-fnox-env = "https://github.com/jdx/mise-env-fnox"
-
 [tools]
 node = "24.15.0"
 deno = "1.46.1"
-fnox = "1.21.0"
+fnox = "1.33.1"
 cargo-binstall = "1.10.15"
 "npm:@commitlint/config-conventional" = "19.6.0"
 "npm:@commitlint/cli" = "19.6.0"
@@ -2108,9 +2105,6 @@ cargo-binstall = "1.10.15"
 "cargo:taplo-cli" = "0.10.0"
 "cargo:rumdl" = "0.1.0"
 "cargo:sd" = "1.0.0"
-
-[env]
-_.fnox-env = { tools = true }
 
 [hooks]
 postinstall = { task = "git:install-hooks" }
@@ -2150,7 +2144,7 @@ run = "cargo fmt --all -- --check"
 run = "rumdl check"
 
 [tasks."test:code"]
-run = "cargo nextest run --locked --workspace --all-features --no-tests warn"
+run = "fnox --profile test exec --replace -- cargo nextest run --locked --workspace --all-features --no-tests warn"
 
 [tasks."test:code:integration"]
 # see also: "agent:test:code:integration"
@@ -2257,6 +2251,7 @@ run = [{ task = "test:code", args = ["--cargo-quiet", "--hide-progress-bar", "--
 #:schema https://fnox.jdx.dev/schema.json
 
 if_missing = "error"
+env = "exec"
 
 [providers]
 keychain = { type = "keychain", service = "repoconf" }
