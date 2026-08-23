@@ -81,8 +81,6 @@ impl InitCommand {
             handle!(cmd!(sh_dir, "git branch --unset-upstream {branch_name}").run_echo(), GitBranchUnsetUpstreamFailed, branch_name);
         }
 
-        handle!(cmd!(sh_dir, "git push --set-upstream {remote_name} {branch_name}").run_echo(), GitPushFailed, remote_name, branch_name);
-
         if !skip_post_init {
             let post_init_script = sh_dir.current_dir().join(".repoconf/hooks/post-init.sh");
             handle!(Self::run_post_init(&sh_dir, &post_init_script, &dir), RunPostInitFailed);
@@ -90,6 +88,8 @@ impl InitCommand {
                 handle!(Self::run_post_init(&sh_dir, &post_init, &dir), RunPostInitFailed);
             }
         }
+
+        handle!(cmd!(sh_dir, "git push --set-upstream {remote_name} {branch_name}").run_echo(), GitPushFailed, remote_name, branch_name);
 
         Ok(ExitCode::SUCCESS)
     }
