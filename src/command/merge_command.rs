@@ -33,7 +33,7 @@ pub struct MergeCommand {
     pub allow_unrelated_histories: bool,
 
     /// Do not push merged changes after merging
-    #[arg(long)]
+    #[arg(long, env = "REPOCONF_NO_PUSH")]
     pub no_push: bool,
 
     /// Do not update template remotes before merging
