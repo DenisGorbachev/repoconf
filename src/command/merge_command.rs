@@ -2,8 +2,7 @@ use crate::{BranchNameStrategy, BranchNameStrategyToBranchNameError, GitLocalBra
 use clap::{Parser, value_parser};
 use errgonomic::{handle, handle_bool};
 use itertools::Itertools;
-use serde_json::Value;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::ExitCode;
 use thiserror::Error;
 use xshell::{Shell, cmd};
@@ -134,7 +133,7 @@ impl MergeCommand {
 
         if !skip_post_merge {
             let post_merge_path = sh_dir.current_dir().join(".repoconf/hooks/post-merge.sh");
-            handle!(Self::run_post_merge(&sh_dir, post_merge_path), RunPostMergeFailed);
+            handle!(Self::run_hook(&sh_dir, post_merge_path), RunHookFailed);
         }
 
         if !no_push {
@@ -152,28 +151,7 @@ impl MergeCommand {
         }
         let unmerged_paths = handle!(cmd!(sh_dir, "git diff --name-only --diff-filter=U").read(), UnmergedPathsReadFailed);
         handle_bool!(!unmerged_paths.is_empty(), UnresolvedConflicts, paths: unmerged_paths);
-        handle!(Self::install_mise_if_repository_configured(sh_dir), InstallMiseIfRepositoryConfiguredFailed);
-        handle!(cmd!(sh_dir, "git commit --no-edit").run_echo(), GitCommitFailed);
-        Ok(())
-    }
-
-    fn install_mise_if_repository_configured(sh_dir: &Shell) -> Result<(), MergeCommandInstallMiseIfRepositoryConfiguredError> {
-        use MergeCommandInstallMiseIfRepositoryConfiguredError::*;
-        let repository_root = PathBuf::from(handle!(cmd!(sh_dir, "git rev-parse --path-format=absolute --show-toplevel").read(), GitRepositoryRootReadFailed));
-        let mise_configs_json = handle!(cmd!(sh_dir, "mise --no-hooks config ls --json").read(), MiseConfigListFailed);
-        let mise_configs = handle!(serde_json::from_str::<Vec<Value>>(&mise_configs_json), FromStrFailed, json: mise_configs_json);
-        handle_bool!(
-            mise_configs.iter().any(|config| config.get("path").and_then(Value::as_str).is_none()),
-            MiseConfigListInvalid,
-            configs: mise_configs
-        );
-        let has_repository_mise_config = mise_configs
-            .iter()
-            .filter_map(|config| config.get("path").and_then(Value::as_str))
-            .any(|path| Path::new(path).starts_with(&repository_root));
-        if has_repository_mise_config {
-            handle!(cmd!(sh_dir, "mise install").run_interactive(), MiseInstallFailed);
-        }
+        handle!(Self::commit_merge(sh_dir), CommitMergeFailed);
         Ok(())
     }
 
@@ -214,14 +192,22 @@ impl MergeCommand {
 
         let merge_head_path = handle!(cmd!(sh_dir, "git rev-parse --path-format=absolute --git-path MERGE_HEAD").read(), GitMergeHeadPathFailed, remote, remote_branch_name);
         if sh_dir.path_exists(merge_head_path) {
-            handle!(cmd!(sh_dir, "git commit --no-edit").run_echo(), GitCommitFailed, remote, remote_branch_name);
+            handle!(Self::commit_merge(sh_dir), CommitMergeFailed, remote, remote_branch_name);
         }
 
         Ok(())
     }
 
-    fn run_post_merge(sh_dir: &Shell, path: PathBuf) -> Result<(), MergeCommandRunPostMergeError> {
-        use MergeCommandRunPostMergeError::*;
+    fn commit_merge(sh_dir: &Shell) -> Result<(), MergeCommandCommitMergeError> {
+        use MergeCommandCommitMergeError::*;
+        let pre_commit_path = sh_dir.current_dir().join(".repoconf/hooks/pre-commit.sh");
+        handle!(Self::run_hook(sh_dir, pre_commit_path), RunHookFailed);
+        handle!(cmd!(sh_dir, "git commit --no-edit").run_echo(), GitCommitFailed);
+        Ok(())
+    }
+
+    fn run_hook(sh_dir: &Shell, path: PathBuf) -> Result<(), MergeCommandRunHookError> {
+        use MergeCommandRunHookError::*;
         if sh_dir.path_exists(&path) {
             handle!(cmd!(sh_dir, "bash {path}").run_interactive(), RunInteractiveFailed, path);
         }
@@ -258,7 +244,7 @@ pub enum MergeCommandRunError {
     #[error("failed to merge remotes")]
     MergeRemotesFailed { source: MergeCommandMergeRemotesError },
     #[error("failed to run the post-merge hook")]
-    RunPostMergeFailed { source: MergeCommandRunPostMergeError },
+    RunHookFailed { source: MergeCommandRunHookError },
     #[error("failed to push merged changes")]
     GitPushFailed { source: xshell::Error },
 }
@@ -271,24 +257,8 @@ pub enum MergeCommandContinueMergeError {
     UnmergedPathsReadFailed { source: xshell::Error },
     #[error("merge conflicts remain:\n{paths}")]
     UnresolvedConflicts { paths: String },
-    #[error("failed to install mise if the repository is configured")]
-    InstallMiseIfRepositoryConfiguredFailed { source: MergeCommandInstallMiseIfRepositoryConfiguredError },
     #[error("failed to commit the resolved merge")]
-    GitCommitFailed { source: xshell::Error },
-}
-
-#[derive(Error, Debug)]
-pub enum MergeCommandInstallMiseIfRepositoryConfiguredError {
-    #[error("failed to resolve the repository root")]
-    GitRepositoryRootReadFailed { source: xshell::Error },
-    #[error("failed to list mise config files")]
-    MiseConfigListFailed { source: xshell::Error },
-    #[error("failed to deserialize the mise config file list")]
-    FromStrFailed { source: serde_json::Error, json: String },
-    #[error("mise returned a config file entry without a string path")]
-    MiseConfigListInvalid { configs: Vec<Value> },
-    #[error("failed to install mise tools and hooks before committing the merge")]
-    MiseInstallFailed { source: xshell::Error },
+    CommitMergeFailed { source: MergeCommandCommitMergeError },
 }
 
 #[derive(Error, Debug)]
@@ -306,11 +276,19 @@ pub enum MergeCommandMergeRemoteError {
     #[error("failed to resolve the merge state path after merging from '{remote}/{remote_branch_name}'")]
     GitMergeHeadPathFailed { source: xshell::Error, remote: String, remote_branch_name: String },
     #[error("failed to commit the merge from '{remote}/{remote_branch_name}'")]
-    GitCommitFailed { source: xshell::Error, remote: String, remote_branch_name: String },
+    CommitMergeFailed { source: MergeCommandCommitMergeError, remote: String, remote_branch_name: String },
 }
 
 #[derive(Error, Debug)]
-pub enum MergeCommandRunPostMergeError {
-    #[error("failed to run the post-merge hook '{path}'")]
+pub enum MergeCommandCommitMergeError {
+    #[error("failed to run the pre-commit hook")]
+    RunHookFailed { source: MergeCommandRunHookError },
+    #[error("failed to commit the merge")]
+    GitCommitFailed { source: xshell::Error },
+}
+
+#[derive(Error, Debug)]
+pub enum MergeCommandRunHookError {
+    #[error("failed to run the repoconf hook '{path}'")]
     RunInteractiveFailed { source: xshell::Error, path: PathBuf },
 }

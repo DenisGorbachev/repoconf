@@ -2375,6 +2375,7 @@ exclude = [
   "fnox.toml",
   "mise.toml",
   "rumdl.toml",
+    "shuck.toml",
   "rustfmt.toml",
   ".yolobox",
 ]
@@ -2422,7 +2423,6 @@ derive_more = { version = "2.1.1", features = ["full"] }
 errgonomic = { git = "https://github.com/DenisGorbachev/errgonomic" }
 futures = "0.3.31"
 itertools = { version = "0.14.0" }
-serde_json = "1.0.151"
 strum = { version = "0.28.0", features = ["derive"] }
 subtype = { git = "https://github.com/DenisGorbachev/subtype" }
 thiserror = "2.0.17"
