@@ -14,11 +14,12 @@ pub struct MergeCommand {
     #[arg(long, short, value_parser = value_parser!(PathBuf))]
     pub dir: Option<PathBuf>,
 
-    /// Continue an in-progress merge after resolving and staging all conflicts
-    #[arg(
-        long = "continue",
-        conflicts_with_all = ["allow_dirty", "skip_dirty", "allow_unrelated_histories", "no_remote_update", "local_branch_strategy", "remote_branch_strategy"]
-    )]
+    /// Finish any pending merge and merge all remaining templates
+    ///
+    /// Resolve and stage all conflicts before continuing. The caller must guarantee that the repository configuration and merge options are unchanged from the original invocation.
+    ///
+    /// If the pending merge was already committed, retry the remaining workflow. Template remotes are fetched again unless --no-remote-update is set, and post-merge hooks and pushing are retried unless disabled.
+    #[arg(long = "continue")]
     pub continue_merge: bool,
 
     /// Run the command even if the repository has uncommitted changes
@@ -84,52 +85,52 @@ impl MergeCommand {
 
         if continue_merge {
             handle!(Self::continue_merge(&sh_dir), ContinueMergeFailed);
-        } else {
-            let remotes = handle!(sh_dir.git_remote_names(), GitRemoteNamesFailed)
-                .filter(|name| name.starts_with("repoconf"))
-                .collect_vec();
-
-            // NOTE: [`PropagateCommand`] relies on this behavior
-            if remotes.is_empty() {
-                return Ok(ExitCode::SUCCESS);
-            }
-
-            let is_clean = handle!(sh_dir.is_clean_repo(), IsCleanRepoFailed);
-            if skip_dirty && !is_clean {
-                eprintln!("[SKIP] repository '{}' has uncommitted changes", dir.display());
-                return Ok(ExitCode::SUCCESS);
-            }
-            handle_bool!(!allow_dirty && !is_clean, RepositoryNotClean, dir);
-
-            let refs = handle!(git_refs(&sh_dir), GitRefsFailed);
-
-            let local_branch_name = handle!(
-                local_branch_strategy.to_branch_name("refs/heads", &refs),
-                LocalBranchNameResolveFailed,
-                prefix: "refs/heads",
-                strategy: local_branch_strategy
-            );
-
-            let local_branch_exists = handle!(
-                sh_dir.git_local_branch_exists(&local_branch_name),
-                GitLocalBranchExistsFailed,
-                branch_name: local_branch_name
-            );
-            handle_bool!(!local_branch_exists, LocalBranchDoesNotExist, branch_name: local_branch_name);
-
-            handle!(
-                cmd!(sh_dir, "git checkout {local_branch_name}").run_echo(),
-                GitCheckoutFailed,
-                branch_name: local_branch_name
-            );
-
-            let remotes_slice = remotes.as_slice();
-            if !no_remote_update {
-                handle!(cmd!(sh_dir, "git remote update {remotes_slice...}").run_echo(), GitRemoteUpdateFailed, remotes);
-            }
-
-            handle!(Self::merge_remotes(&sh_dir, remotes, &remote_branch_strategy, &refs, allow_unrelated_histories), MergeRemotesFailed);
         }
+
+        let remotes = handle!(sh_dir.git_remote_names(), GitRemoteNamesFailed)
+            .filter(|name| name.starts_with("repoconf"))
+            .collect_vec();
+
+        // NOTE: [`PropagateCommand`] relies on this behavior
+        if remotes.is_empty() {
+            return Ok(ExitCode::SUCCESS);
+        }
+
+        let is_clean = handle!(sh_dir.is_clean_repo(), IsCleanRepoFailed);
+        if skip_dirty && !is_clean {
+            eprintln!("[SKIP] repository '{}' has uncommitted changes", dir.display());
+            return Ok(ExitCode::SUCCESS);
+        }
+        handle_bool!(!allow_dirty && !is_clean, RepositoryNotClean, dir);
+
+        let remotes_slice = remotes.as_slice();
+        if !no_remote_update {
+            handle!(cmd!(sh_dir, "git remote update {remotes_slice...}").run_echo(), GitRemoteUpdateFailed, remotes);
+        }
+
+        let refs = handle!(git_refs(&sh_dir), GitRefsFailed);
+
+        let local_branch_name = handle!(
+            local_branch_strategy.to_branch_name("refs/heads", &refs),
+            LocalBranchNameResolveFailed,
+            prefix: "refs/heads",
+            strategy: local_branch_strategy
+        );
+
+        let local_branch_exists = handle!(
+            sh_dir.git_local_branch_exists(&local_branch_name),
+            GitLocalBranchExistsFailed,
+            branch_name: local_branch_name
+        );
+        handle_bool!(!local_branch_exists, LocalBranchDoesNotExist, branch_name: local_branch_name);
+
+        handle!(
+            cmd!(sh_dir, "git checkout {local_branch_name}").run_echo(),
+            GitCheckoutFailed,
+            branch_name: local_branch_name
+        );
+
+        handle!(Self::merge_remotes(&sh_dir, remotes, &remote_branch_strategy, &refs, allow_unrelated_histories), MergeRemotesFailed);
 
         if !skip_post_merge {
             let post_merge_path = sh_dir.current_dir().join(".repoconf/hooks/post-merge.sh");
@@ -146,7 +147,9 @@ impl MergeCommand {
     fn continue_merge(sh_dir: &Shell) -> Result<(), MergeCommandContinueMergeError> {
         use MergeCommandContinueMergeError::*;
         let merge_head_path = handle!(cmd!(sh_dir, "git rev-parse --path-format=absolute --git-path MERGE_HEAD").read(), GitMergeHeadPathFailed);
-        handle_bool!(!sh_dir.path_exists(merge_head_path), MergeNotInProgress);
+        if !sh_dir.path_exists(merge_head_path) {
+            return Ok(());
+        }
         let unmerged_paths = handle!(cmd!(sh_dir, "git diff --name-only --diff-filter=U").read(), UnmergedPathsReadFailed);
         handle_bool!(!unmerged_paths.is_empty(), UnresolvedConflicts, paths: unmerged_paths);
         handle!(Self::install_mise_if_repository_configured(sh_dir), InstallMiseIfRepositoryConfiguredFailed);
@@ -264,8 +267,6 @@ pub enum MergeCommandRunError {
 pub enum MergeCommandContinueMergeError {
     #[error("failed to resolve the merge state path")]
     GitMergeHeadPathFailed { source: xshell::Error },
-    #[error("no merge is in progress")]
-    MergeNotInProgress,
     #[error("failed to read unresolved merge paths")]
     UnmergedPathsReadFailed { source: xshell::Error },
     #[error("merge conflicts remain:\n{paths}")]
