@@ -17,7 +17,7 @@ pub struct MergeCommand {
     ///
     /// Resolve and stage all conflicts before continuing. The caller must guarantee that the repository configuration and merge options are unchanged from the original invocation.
     ///
-    /// If the pending merge was already committed, retry the remaining workflow. Template remotes are fetched again unless --no-remote-update is set, and post-merge hooks and pushing are retried unless disabled.
+    /// If the pending merge was already committed, retry the remaining workflow. The local branch is pulled again unless --no-pull is set, template remotes are fetched again unless --no-remote-update is set, and post-merge hooks and pushing are retried unless disabled.
     #[arg(long = "continue")]
     pub continue_merge: bool,
 
@@ -25,7 +25,7 @@ pub struct MergeCommand {
     #[arg(long)]
     pub allow_dirty: bool,
 
-    /// Exit successfully without modifying the repository if it has uncommitted changes
+    /// Skip ordinary uncommitted changes; pending merges require --continue
     #[arg(long, conflicts_with = "allow_dirty")]
     pub skip_dirty: bool,
 
@@ -35,6 +35,9 @@ pub struct MergeCommand {
     /// Do not push merged changes after merging
     #[arg(long, env = "REPOCONF_NO_PUSH")]
     pub no_push: bool,
+
+    #[arg(long, env = "REPOCONF_NO_PULL", help = "Do not pull the local branch's upstream before merging")]
+    pub no_pull: bool,
 
     /// Do not update template remotes before merging
     #[arg(long)]
@@ -73,6 +76,7 @@ impl MergeCommand {
             skip_dirty,
             allow_unrelated_histories,
             no_push,
+            no_pull,
             no_remote_update,
             skip_post_merge,
             local_branch_strategy,
@@ -82,29 +86,13 @@ impl MergeCommand {
         let dir = handle!(unwrap_or_current_dir(dir), UnwrapOrCurrentDirFailed);
         let sh_dir = handle!(Shell::new(), ShellNewFailed).with_current_dir(&dir);
 
-        if continue_merge {
-            handle!(Self::continue_merge(&sh_dir), ContinueMergeFailed);
-        }
-
         let remotes = handle!(sh_dir.git_remote_names(), GitRemoteNamesFailed)
-            .filter(|name| name.starts_with("repoconf"))
+            .filter(|name| name.starts_with("repoconf-"))
             .collect_vec();
 
         // NOTE: [`PropagateCommand`] relies on this behavior
         if remotes.is_empty() {
             return Ok(ExitCode::SUCCESS);
-        }
-
-        let is_clean = handle!(sh_dir.is_clean_repo(), IsCleanRepoFailed);
-        if skip_dirty && !is_clean {
-            eprintln!("[SKIP] repository '{}' has uncommitted changes", dir.display());
-            return Ok(ExitCode::SUCCESS);
-        }
-        handle_bool!(!allow_dirty && !is_clean, RepositoryNotClean, dir);
-
-        let remotes_slice = remotes.as_slice();
-        if !no_remote_update {
-            handle!(cmd!(sh_dir, "git remote update {remotes_slice...}").run_echo(), GitRemoteUpdateFailed, remotes);
         }
 
         let refs = handle!(git_refs(&sh_dir), GitRefsFailed);
@@ -123,12 +111,35 @@ impl MergeCommand {
         );
         handle_bool!(!local_branch_exists, LocalBranchDoesNotExist, branch_name: local_branch_name);
 
+        let merge_head_path = handle!(cmd!(sh_dir, "git rev-parse --path-format=absolute --git-path MERGE_HEAD").read(), GitMergeHeadPathFailed, dir);
+        if sh_dir.path_exists(&merge_head_path) {
+            handle_bool!(!continue_merge, MergeStateInvalid, dir);
+            handle!(Self::continue_merge(&sh_dir, &local_branch_name), ContinueMergeFailed, dir, branch_name: local_branch_name);
+        }
+
+        let is_clean = handle!(sh_dir.is_clean_repo(), IsCleanRepoFailed);
+        if skip_dirty && !is_clean {
+            eprintln!("[SKIP] repository '{}' has uncommitted changes", dir.display());
+            return Ok(ExitCode::SUCCESS);
+        }
+        handle_bool!(!allow_dirty && !is_clean, RepositoryNotClean, dir);
+
         handle!(
             cmd!(sh_dir, "git checkout {local_branch_name}").run_echo(),
             GitCheckoutFailed,
             branch_name: local_branch_name
         );
 
+        if !no_pull {
+            handle!(Self::pull(&sh_dir, &local_branch_name), PullFailed, dir, branch_name: local_branch_name);
+        }
+
+        if !no_remote_update {
+            let remotes_slice = remotes.as_slice();
+            handle!(cmd!(sh_dir, "git remote update {remotes_slice...}").run_echo(), GitRemoteUpdateFailed, remotes);
+        }
+
+        let refs = handle!(git_refs(&sh_dir), GitRemoteRefsFailed);
         handle!(Self::merge_remotes(&sh_dir, remotes, &remote_branch_strategy, &refs, allow_unrelated_histories), MergeRemotesFailed);
 
         if !skip_post_merge {
@@ -143,15 +154,30 @@ impl MergeCommand {
         Ok(ExitCode::SUCCESS)
     }
 
-    fn continue_merge(sh_dir: &Shell) -> Result<(), MergeCommandContinueMergeError> {
+    fn continue_merge(sh_dir: &Shell, local_branch_name: &str) -> Result<(), MergeCommandContinueMergeError> {
         use MergeCommandContinueMergeError::*;
-        let merge_head_path = handle!(cmd!(sh_dir, "git rev-parse --path-format=absolute --git-path MERGE_HEAD").read(), GitMergeHeadPathFailed);
-        if !sh_dir.path_exists(merge_head_path) {
-            return Ok(());
-        }
+        let current_branch = handle!(cmd!(sh_dir, "git branch --show-current").read(), GitBranchFailed);
+        handle_bool!(current_branch != local_branch_name, MergeBranchInvalid, current_branch, local_branch_name: local_branch_name);
         let unmerged_paths = handle!(cmd!(sh_dir, "git diff --name-only --diff-filter=U").read(), UnmergedPathsReadFailed);
         handle_bool!(!unmerged_paths.is_empty(), UnresolvedConflicts, paths: unmerged_paths);
         handle!(Self::commit_merge(sh_dir), CommitMergeFailed);
+        Ok(())
+    }
+
+    fn pull(sh_dir: &Shell, local_branch_name: &str) -> Result<(), MergeCommandPullError> {
+        use MergeCommandPullError::*;
+        let upstream = handle!(
+            cmd!(sh_dir, "git for-each-ref --format='%(upstream)' refs/heads/{local_branch_name}").read(),
+            GitForEachRefFailed,
+            local_branch_name: local_branch_name
+        );
+        handle_bool!(upstream.is_empty(), UpstreamNotFound, local_branch_name: local_branch_name);
+        handle!(
+            cmd!(sh_dir, "git pull --ff-only --no-rebase").run_echo(),
+            GitPullFailed,
+            local_branch_name: local_branch_name,
+            upstream
+        );
         Ok(())
     }
 
@@ -221,16 +247,22 @@ pub enum MergeCommandRunError {
     UnwrapOrCurrentDirFailed { source: UnwrapOrCurrentDirError },
     #[error("failed to create a shell instance")]
     ShellNewFailed { source: xshell::Error },
-    #[error("failed to continue the merge")]
-    ContinueMergeFailed { source: MergeCommandContinueMergeError },
+    #[error("failed to continue the merge on branch '{branch_name}' in '{dir}'", dir = dir.display())]
+    ContinueMergeFailed { source: MergeCommandContinueMergeError, dir: PathBuf, branch_name: String },
     #[error("failed to read git remote names")]
     GitRemoteNamesFailed { source: GitRemoteNamesError },
     #[error("failed to check repository status")]
     IsCleanRepoFailed { source: IsCleanRepoError },
+    #[error("failed to resolve the merge state path in '{dir}'", dir = dir.display())]
+    GitMergeHeadPathFailed { source: xshell::Error, dir: PathBuf },
+    #[error("repository '{dir}' has an unfinished merge; rerun with --continue to attempt committing it", dir = dir.display())]
+    MergeStateInvalid { dir: PathBuf },
     #[error("repository '{dir}' has uncommitted changes")]
     RepositoryNotClean { dir: PathBuf },
     #[error("failed to read git refs")]
     GitRefsFailed { source: GitRefsError },
+    #[error("failed to read git refs after updating remotes")]
+    GitRemoteRefsFailed { source: GitRefsError },
     #[error("failed to resolve local branch name for prefix '{prefix}'")]
     LocalBranchNameResolveFailed { source: BranchNameStrategyToBranchNameError, prefix: String, strategy: BranchNameStrategy },
     #[error("failed to check whether local branch '{branch_name}' exists")]
@@ -239,6 +271,8 @@ pub enum MergeCommandRunError {
     LocalBranchDoesNotExist { branch_name: String },
     #[error("failed to check out local branch '{branch_name}'")]
     GitCheckoutFailed { source: xshell::Error, branch_name: String },
+    #[error("failed to update branch '{branch_name}' from its upstream in '{dir}'", dir = dir.display())]
+    PullFailed { source: MergeCommandPullError, dir: PathBuf, branch_name: String },
     #[error("failed to update repoconf remotes")]
     GitRemoteUpdateFailed { source: xshell::Error, remotes: Vec<String> },
     #[error("failed to merge remotes")]
@@ -251,14 +285,26 @@ pub enum MergeCommandRunError {
 
 #[derive(Error, Debug)]
 pub enum MergeCommandContinueMergeError {
-    #[error("failed to resolve the merge state path")]
-    GitMergeHeadPathFailed { source: xshell::Error },
+    #[error("failed to read the current branch before continuing the merge")]
+    GitBranchFailed { source: xshell::Error },
+    #[error("cannot continue a merge on branch '{current_branch}' while targeting '{local_branch_name}'; select the current branch with --local-branch or finish the pending merge separately")]
+    MergeBranchInvalid { current_branch: String, local_branch_name: String },
     #[error("failed to read unresolved merge paths")]
     UnmergedPathsReadFailed { source: xshell::Error },
     #[error("merge conflicts remain:\n{paths}")]
     UnresolvedConflicts { paths: String },
     #[error("failed to commit the resolved merge")]
     CommitMergeFailed { source: MergeCommandCommitMergeError },
+}
+
+#[derive(Error, Debug)]
+pub enum MergeCommandPullError {
+    #[error("failed to read the upstream for local branch '{local_branch_name}'")]
+    GitForEachRefFailed { source: xshell::Error, local_branch_name: String },
+    #[error("local branch '{local_branch_name}' has no upstream; configure one with git branch --set-upstream-to or rerun with --no-pull")]
+    UpstreamNotFound { local_branch_name: String },
+    #[error("failed to pull upstream '{upstream}' into local branch '{local_branch_name}' with fast-forward-only updates")]
+    GitPullFailed { source: xshell::Error, local_branch_name: String, upstream: String },
 }
 
 #[derive(Error, Debug)]
