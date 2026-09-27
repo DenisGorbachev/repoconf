@@ -95,6 +95,13 @@ impl MergeCommand {
             return Ok(ExitCode::SUCCESS);
         }
 
+        let merge_head_path = handle!(cmd!(sh_dir, "git rev-parse --path-format=absolute --git-path MERGE_HEAD").read(), GitMergeHeadPathFailed, dir);
+        let has_pending_merge = sh_dir.path_exists(&merge_head_path);
+        handle_bool!(has_pending_merge && !continue_merge, MergeStateInvalid, dir);
+        if !has_pending_merge && handle!(Self::should_skip_dirty(&sh_dir, allow_dirty, skip_dirty), ShouldSkipDirtyFailed, dir, allow_dirty, skip_dirty) {
+            return Ok(ExitCode::SUCCESS);
+        }
+
         let refs = handle!(git_refs(&sh_dir), GitRefsFailed);
 
         let local_branch_name = handle!(
@@ -111,18 +118,12 @@ impl MergeCommand {
         );
         handle_bool!(!local_branch_exists, LocalBranchDoesNotExist, branch_name: local_branch_name);
 
-        let merge_head_path = handle!(cmd!(sh_dir, "git rev-parse --path-format=absolute --git-path MERGE_HEAD").read(), GitMergeHeadPathFailed, dir);
-        if sh_dir.path_exists(&merge_head_path) {
-            handle_bool!(!continue_merge, MergeStateInvalid, dir);
+        if has_pending_merge {
             handle!(Self::continue_merge(&sh_dir, &local_branch_name), ContinueMergeFailed, dir, branch_name: local_branch_name);
         }
-
-        let is_clean = handle!(sh_dir.is_clean_repo(), IsCleanRepoFailed);
-        if skip_dirty && !is_clean {
-            eprintln!("[SKIP] repository '{}' has uncommitted changes", dir.display());
+        if has_pending_merge && handle!(Self::should_skip_dirty(&sh_dir, allow_dirty, skip_dirty), ShouldSkipDirtyAfterContinueFailed, dir, allow_dirty, skip_dirty) {
             return Ok(ExitCode::SUCCESS);
         }
-        handle_bool!(!allow_dirty && !is_clean, RepositoryNotClean, dir);
 
         handle!(
             cmd!(sh_dir, "git checkout {local_branch_name}").run_echo(),
@@ -154,6 +155,17 @@ impl MergeCommand {
         Ok(ExitCode::SUCCESS)
     }
 
+    fn should_skip_dirty(sh_dir: &Shell, allow_dirty: bool, skip_dirty: bool) -> Result<bool, MergeCommandShouldSkipDirtyError> {
+        use MergeCommandShouldSkipDirtyError::*;
+        let is_clean = handle!(sh_dir.is_clean_repo(), IsCleanRepoFailed, dir: sh_dir.current_dir());
+        if skip_dirty && !is_clean {
+            eprintln!("[SKIP] repository '{}' has uncommitted changes", sh_dir.current_dir().display());
+            return Ok(true);
+        }
+        handle_bool!(!allow_dirty && !is_clean, RepositoryNotClean, dir: sh_dir.current_dir());
+        Ok(false)
+    }
+
     fn continue_merge(sh_dir: &Shell, local_branch_name: &str) -> Result<(), MergeCommandContinueMergeError> {
         use MergeCommandContinueMergeError::*;
         let current_branch = handle!(cmd!(sh_dir, "git branch --show-current").read(), GitBranchFailed);
@@ -173,7 +185,7 @@ impl MergeCommand {
         );
         handle_bool!(upstream.is_empty(), UpstreamNotFound, local_branch_name: local_branch_name);
         handle!(
-            cmd!(sh_dir, "git pull --ff-only --no-rebase").run_echo(),
+            cmd!(sh_dir, "git pull --ff-only --no-rebase --no-squash").run_echo(),
             GitPullFailed,
             local_branch_name: local_branch_name,
             upstream
@@ -217,10 +229,11 @@ impl MergeCommand {
         handle!(cmd!(sh_dir, "git merge {remote}/{remote_branch_name} {flags...}").run_echo(), GitMergeFailed, remote, remote_branch_name);
 
         let merge_head_path = handle!(cmd!(sh_dir, "git rev-parse --path-format=absolute --git-path MERGE_HEAD").read(), GitMergeHeadPathFailed, remote, remote_branch_name);
-        if sh_dir.path_exists(merge_head_path) {
-            handle!(Self::commit_merge(sh_dir), CommitMergeFailed, remote, remote_branch_name);
+        if !sh_dir.path_exists(merge_head_path) {
+            return Ok(());
         }
 
+        handle!(Self::commit_merge(sh_dir), CommitMergeFailed, remote, remote_branch_name);
         Ok(())
     }
 
@@ -234,9 +247,10 @@ impl MergeCommand {
 
     fn run_hook(sh_dir: &Shell, path: PathBuf) -> Result<(), MergeCommandRunHookError> {
         use MergeCommandRunHookError::*;
-        if sh_dir.path_exists(&path) {
-            handle!(cmd!(sh_dir, "bash {path}").run_interactive(), RunInteractiveFailed, path);
+        if !sh_dir.path_exists(&path) {
+            return Ok(());
         }
+        handle!(cmd!(sh_dir, "bash {path}").run_interactive(), RunInteractiveFailed, path);
         Ok(())
     }
 }
@@ -251,14 +265,14 @@ pub enum MergeCommandRunError {
     ContinueMergeFailed { source: MergeCommandContinueMergeError, dir: PathBuf, branch_name: String },
     #[error("failed to read git remote names")]
     GitRemoteNamesFailed { source: GitRemoteNamesError },
-    #[error("failed to check repository status")]
-    IsCleanRepoFailed { source: IsCleanRepoError },
+    #[error("failed to check whether to skip repository '{dir}'", dir = dir.display())]
+    ShouldSkipDirtyFailed { source: MergeCommandShouldSkipDirtyError, dir: PathBuf, allow_dirty: bool, skip_dirty: bool },
+    #[error("failed to check whether to skip repository '{dir}' after continuing its merge", dir = dir.display())]
+    ShouldSkipDirtyAfterContinueFailed { source: MergeCommandShouldSkipDirtyError, dir: PathBuf, allow_dirty: bool, skip_dirty: bool },
     #[error("failed to resolve the merge state path in '{dir}'", dir = dir.display())]
     GitMergeHeadPathFailed { source: xshell::Error, dir: PathBuf },
     #[error("repository '{dir}' has an unfinished merge; rerun with --continue to attempt committing it", dir = dir.display())]
     MergeStateInvalid { dir: PathBuf },
-    #[error("repository '{dir}' has uncommitted changes")]
-    RepositoryNotClean { dir: PathBuf },
     #[error("failed to read git refs")]
     GitRefsFailed { source: GitRefsError },
     #[error("failed to read git refs after updating remotes")]
@@ -281,6 +295,14 @@ pub enum MergeCommandRunError {
     RunHookFailed { source: MergeCommandRunHookError },
     #[error("failed to push merged changes")]
     GitPushFailed { source: xshell::Error },
+}
+
+#[derive(Error, Debug)]
+pub enum MergeCommandShouldSkipDirtyError {
+    #[error("failed to check repository status in '{dir}'", dir = dir.display())]
+    IsCleanRepoFailed { source: IsCleanRepoError, dir: PathBuf },
+    #[error("repository '{dir}' has uncommitted changes", dir = dir.display())]
+    RepositoryNotClean { dir: PathBuf },
 }
 
 #[derive(Error, Debug)]

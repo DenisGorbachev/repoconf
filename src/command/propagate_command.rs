@@ -26,6 +26,9 @@ pub struct PropagateCommand {
     #[arg(long, short, default_value = "-")]
     pub remote_branch_name: BranchNameStrategy,
 
+    #[arg(long, env = "REPOCONF_NO_PULL", help = "Do not pull local branches' upstreams before merging")]
+    pub no_pull: bool,
+
     /// Directory to search in, recursively
     #[arg(value_parser = value_parser!(PathBuf))]
     pub dir: PathBuf,
@@ -37,11 +40,12 @@ impl PropagateCommand {
         let Self {
             local_branch_name,
             remote_branch_name,
+            no_pull,
             dir,
         } = self;
 
         let repos = handle!(Self::collect_repos(&dir), CollectReposFailed, dir);
-        handle!(Self::merge_repos(repos, local_branch_name, remote_branch_name).await, MergeReposFailed);
+        handle!(Self::merge_repos(repos, local_branch_name, remote_branch_name, no_pull).await, MergeReposFailed, no_pull);
 
         Ok(ExitCode::SUCCESS)
     }
@@ -57,24 +61,24 @@ impl PropagateCommand {
         Ok(repos)
     }
 
-    async fn merge_repos(repos: Vec<PathBuf>, local_branch_name: BranchNameStrategy, remote_branch_name: BranchNameStrategy) -> Result<(), PropagateCommandMergeReposError> {
+    async fn merge_repos(repos: Vec<PathBuf>, local_branch_name: BranchNameStrategy, remote_branch_name: BranchNameStrategy, no_pull: bool) -> Result<(), PropagateCommandMergeReposError> {
         use PropagateCommandMergeReposError::*;
-        stream::iter(
-            repos
-                .into_iter()
-                .map(Ok::<_, PropagateCommandMergeReposError>),
-        )
-        .try_for_each(|repo| async {
-            println!("Entering {}", repo.display());
-            let merge_command = MergeCommand {
-                local_branch_strategy: local_branch_name.clone(),
-                remote_branch_strategy: remote_branch_name.clone(),
-                dir: Some(repo),
-                ..MergeCommand::default()
-            };
-            map_err!(merge_command.run().await, MergeCommandRunFailed).map(|_| ())
-        })
-        .await
+        let repos = repos
+            .into_iter()
+            .map(Ok::<_, PropagateCommandMergeReposError>);
+        stream::iter(repos)
+            .try_for_each(|repo| async {
+                println!("Entering {}", repo.display());
+                let merge_command = MergeCommand {
+                    local_branch_strategy: local_branch_name.clone(),
+                    remote_branch_strategy: remote_branch_name.clone(),
+                    no_pull,
+                    dir: Some(repo),
+                    ..MergeCommand::default()
+                };
+                map_err!(merge_command.run().await, MergeCommandRunFailed).map(|_| ())
+            })
+            .await
     }
 }
 
@@ -83,7 +87,7 @@ pub enum PropagateCommandRunError {
     #[error("failed to discover repositories under '{dir}'")]
     CollectReposFailed { source: PropagateCommandCollectReposError, dir: PathBuf },
     #[error("failed to merge discovered repositories")]
-    MergeReposFailed { source: PropagateCommandMergeReposError },
+    MergeReposFailed { source: PropagateCommandMergeReposError, no_pull: bool },
 }
 
 #[derive(Error, Debug)]
