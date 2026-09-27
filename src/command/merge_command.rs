@@ -1,8 +1,8 @@
-use crate::{BranchNameStrategy, BranchNameStrategyToBranchNameError, GitBranchName, GitLocalBranchExists, GitLocalBranchExistsError, GitRefsError, GitRemoteNames, GitRemoteNamesError, IsCleanRepo, IsCleanRepoError, UnwrapOrCurrentDirError, git_refs, unwrap_or_current_dir};
+use crate::{BranchNameStrategy, BranchNameStrategyToBranchNameError, CheckGitMergeStateError, GitBranchName, GitLocalBranchExists, GitLocalBranchExistsError, GitRefsError, GitRemoteNames, GitRemoteNamesError, IsCleanRepo, IsCleanRepoError, UnwrapOrCurrentDirError, check_git_merge_state, git_refs, unwrap_or_current_dir};
 use clap::{Parser, value_parser};
-use errgonomic::{handle, handle_bool, handle_opt_take};
+use errgonomic::{handle, handle_bool};
 use itertools::Itertools;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use thiserror::Error;
 use xshell::{Shell, cmd};
@@ -77,6 +77,8 @@ impl MergeCommand {
 
         let dir = handle!(unwrap_or_current_dir(dir), UnwrapOrCurrentDirFailed);
         let sh_dir = handle!(Shell::new(), ShellNewFailed).with_current_dir(&dir);
+        let git_dir = handle!(cmd!(sh_dir, "git rev-parse --path-format=absolute --git-dir").read(), GitDirReadFailed, dir);
+        let git_dir = PathBuf::from(git_dir);
 
         let remotes = handle!(sh_dir.git_remote_names(), GitRemoteNamesFailed)
             .filter(|name| name.starts_with("repoconf-"))
@@ -87,7 +89,8 @@ impl MergeCommand {
             return Ok(ExitCode::SUCCESS);
         }
 
-        let continued_branch_name = handle!(Self::finish_pending_merge(&sh_dir, &local_branch_strategy), FinishPendingMergeFailed, dir);
+        handle!(check_git_merge_state(&sh_dir, &git_dir), CheckGitMergeStateFailed, dir);
+        let continued_branch_name = handle!(Self::finish_pending_merge(&sh_dir, &git_dir, &local_branch_strategy), FinishPendingMergeFailed, dir, git_dir);
         let is_clean = handle!(sh_dir.is_clean_repo(), IsCleanRepoFailed, dir);
         if handle!(Self::should_skip_dirty(is_clean, allow_dirty, skip_dirty), ShouldSkipDirtyFailed, dir, is_clean, allow_dirty, skip_dirty) {
             eprintln!("[SKIP] repository '{}' has uncommitted changes", dir.display());
@@ -144,21 +147,9 @@ impl MergeCommand {
         Ok(branch_name)
     }
 
-    fn finish_pending_merge(sh_dir: &Shell, strategy: &BranchNameStrategy) -> Result<Option<GitBranchName>, MergeCommandFinishPendingMergeError> {
+    fn finish_pending_merge(sh_dir: &Shell, git_dir: &impl AsRef<Path>, strategy: &BranchNameStrategy) -> Result<Option<GitBranchName>, MergeCommandFinishPendingMergeError> {
         use MergeCommandFinishPendingMergeError::*;
-        let git_dir = handle!(cmd!(sh_dir, "git rev-parse --path-format=absolute --git-dir").read(), GitDirReadFailed);
-        let git_dir = PathBuf::from(git_dir);
-        let mut unexpected_state = [
-            "rebase-merge",
-            "rebase-apply",
-            "CHERRY_PICK_HEAD",
-            "REVERT_HEAD",
-            "sequencer",
-            "BISECT_START",
-        ]
-        .into_iter()
-        .find(|state| sh_dir.path_exists(git_dir.join(state)));
-        handle_opt_take!(unexpected_state, RepositoryStateInvalid, state, git_dir);
+        let git_dir = git_dir.as_ref();
         let unmerged_paths = handle!(cmd!(sh_dir, "git diff --name-only --diff-filter=U").read(), UnmergedPathsReadFailed);
         handle_bool!(!unmerged_paths.is_empty(), UnresolvedConflicts, paths: unmerged_paths);
         if !sh_dir.path_exists(git_dir.join("MERGE_HEAD")) {
@@ -256,8 +247,12 @@ pub enum MergeCommandRunError {
     UnwrapOrCurrentDirFailed { source: UnwrapOrCurrentDirError },
     #[error("failed to create a shell instance")]
     ShellNewFailed { source: xshell::Error },
+    #[error("failed to resolve the git directory in '{dir}'", dir = dir.display())]
+    GitDirReadFailed { source: xshell::Error, dir: PathBuf },
+    #[error("failed to check the git state in '{dir}'", dir = dir.display())]
+    CheckGitMergeStateFailed { source: CheckGitMergeStateError, dir: PathBuf },
     #[error("failed to finish a pending merge in '{dir}'", dir = dir.display())]
-    FinishPendingMergeFailed { source: MergeCommandFinishPendingMergeError, dir: PathBuf },
+    FinishPendingMergeFailed { source: MergeCommandFinishPendingMergeError, dir: PathBuf, git_dir: PathBuf },
     #[error("failed to read git remote names")]
     GitRemoteNamesFailed { source: GitRemoteNamesError },
     #[error("failed to check whether to skip repository '{dir}'", dir = dir.display())]
@@ -302,10 +297,6 @@ pub enum MergeCommandResolveLocalBranchError {
 
 #[derive(Error, Debug)]
 pub enum MergeCommandFinishPendingMergeError {
-    #[error("failed to resolve the git directory")]
-    GitDirReadFailed { source: xshell::Error },
-    #[error("git state '{state}' in '{git_dir}' belongs to another unfinished operation; finish or abort that operation before merging templates", git_dir = git_dir.display())]
-    RepositoryStateInvalid { state: String, git_dir: PathBuf },
     #[error("failed to resolve the destination branch before continuing the merge")]
     ResolveLocalBranchFailed { source: MergeCommandResolveLocalBranchError },
     #[error("failed to read the current branch before continuing the merge")]

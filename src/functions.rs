@@ -10,6 +10,10 @@ mod unwrap_or_current_dir;
 
 pub use unwrap_or_current_dir::*;
 
+mod check_git_merge_state;
+
+pub use check_git_merge_state::*;
+
 mod git_refs;
 
 pub use git_refs::*;
