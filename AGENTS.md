@@ -1621,6 +1621,9 @@ name = "repoconf"
 title = "Repoconf"
 readme = { generate = false }
 
+[workspace.lints.cargo]
+unused_dependencies = "deny"
+
 [workspace.lints.rust]
 redundant_imports = "deny"
 unused_import_braces = "deny"
@@ -1679,7 +1682,6 @@ xshell = { version = "0.3.0-pre.2" }
 
 ```rust
 #![deny(clippy::arithmetic_side_effects)]
-#![cfg_attr(not(test), deny(unused_crate_dependencies))]
 
 use tokio as _;
 
