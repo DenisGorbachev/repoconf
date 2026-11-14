@@ -75,15 +75,10 @@ workspace = true
 [dependencies]
 clap = { version = "4.5.11", features = ["derive", "env"] }
 demand = { version = "1.6.4" }
-derive-getters = { version = "0.5.0", features = ["auto_copy_getters"] }
-derive-new = "0.7.0"
-derive_more = { version = "2.1.1", features = ["full"] }
 errgonomic = { git = "https://github.com/DenisGorbachev/errgonomic" }
 futures = "0.3.31"
 itertools = { version = "0.14.0" }
 strum = { version = "0.28.0", features = ["derive"] }
-subtype = { git = "https://github.com/DenisGorbachev/subtype" }
-thiserror = "2.0.17"
 tokio = { version = "1.39.2", features = [
   "macros",
   "fs",
@@ -94,3 +89,8 @@ tokio = { version = "1.39.2", features = [
 url = "2.5.4"
 walkdir = { version = "2.5.0" }
 xshell = { version = "0.3.0-pre.2" }
+thiserror = "2.0.21"
+derive-getters = { version = "0.5.0", features = ["auto_copy_getters"] }
+derive-new = "0.7.0"
+derive_more = { version = "2.1.1", features = ["full"] }
+subtype = { git = "https://github.com/DenisGorbachev/subtype" }
