@@ -131,7 +131,7 @@ impl CreateCommand {
             template_url,
             dir,
         };
-        handle!(init_cmd.run().await, InitCommandRunFailed, repo_name_full);
+        let _ = handle!(init_cmd.run().await, InitCommandRunFailed, repo_name_full);
 
         Ok(ExitCode::SUCCESS)
     }
